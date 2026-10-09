@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <style name="Theme.Levelia" parent="android:Theme.Material.Light.NoActionBar" />
+    <!-- Fondo de la ventana = fondo de la app, para que no haya un destello blanco al abrir -->
+    <style name="Theme.Levelia" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/fondo_principal</item>
+    </style>
 </resources>
