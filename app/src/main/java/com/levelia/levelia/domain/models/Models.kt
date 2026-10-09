@@ -18,7 +18,30 @@ data class RegisterState(
     val tiempoReenvio: Int = 0,
     val emailVerificado: Boolean = false,
     val perfilCreado: Boolean = false,
+    /** Mensajes bajo cada campo del paso 1 (campo en rojo). */
+    val errores: ErroresPaso1 = ErroresPaso1(),
+    /** Diálogo pixel-art que se muestra encima del paso 1; null = ninguno. */
+    val dialogo: DialogoAuth? = null,
 )
+
+/** Mensaje de error por campo del formulario del paso 1; null = campo sin error. */
+data class ErroresPaso1(
+    val nombre: String? = null,
+    val edad: String? = null,
+    val email: String? = null,
+    val contraseña: String? = null,
+) {
+    val hayErrores: Boolean get() = nombre != null || edad != null || email != null || contraseña != null
+}
+
+/** Mensaje de error por campo del login; null = campo sin error. */
+data class ErroresLogin(
+    val email: String? = null,
+    val contraseña: String? = null,
+)
+
+/** Diálogos de error del diseño (título, ícono y texto los define la UI). */
+enum class DialogoAuth { VALIDACION, CORREO_INVALIDO, CONTRASENA_DEBIL, ERROR_SERVIDOR }
 
 data class UserData(
     val id: String = UUID.randomUUID().toString(),

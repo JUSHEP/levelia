@@ -49,7 +49,8 @@ fun AuthColumn(
     onBack: (() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    Box(modifier = Modifier.fillMaxSize().imePadding()) {
+    // Mismo fondo del diseño que Login/Registro paso 1 (las demás pantallas se irán rehaciendo igual)
+    LeveliaBackground(modifier = Modifier.imePadding()) {
         Column(
             modifier = Modifier
                 .fillMaxSize()

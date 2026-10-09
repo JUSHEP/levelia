@@ -7,6 +7,9 @@ import com.levelia.levelia.BuildConfig
 import com.levelia.levelia.data.repository.AuthRepository
 import com.levelia.levelia.domain.models.AuthResult
 import com.levelia.levelia.domain.models.Avatar
+import com.levelia.levelia.domain.models.DialogoAuth
+import com.levelia.levelia.domain.models.ErroresLogin
+import com.levelia.levelia.domain.models.ErroresPaso1
 import com.levelia.levelia.domain.models.RegisterState
 import com.levelia.levelia.domain.models.UserData
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -64,6 +67,10 @@ class AuthViewModel @Inject constructor(
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error.asStateFlow()
 
+    /** Mensajes bajo cada campo del login (campo en rojo). */
+    private val _erroresLogin = MutableStateFlow(ErroresLogin())
+    val erroresLogin: StateFlow<ErroresLogin> = _erroresLogin.asStateFlow()
+
     private var cuentaRegresivaJob: Job? = null
 
     init {
@@ -73,13 +80,20 @@ class AuthViewModel @Inject constructor(
 
     // ============================== REGISTRO ==============================
 
-    fun onNombreChanged(nombre: String) = actualizar { copy(nombre = nombre, error = null) }
+    // Al editar un campo se le quita su mensaje de error (el campo deja de verse en rojo)
+    fun onNombreChanged(nombre: String) =
+        actualizar { copy(nombre = nombre, error = null, errores = errores.copy(nombre = null)) }
 
-    fun onEdadChanged(edad: Int) = actualizar { copy(edad = edad, error = null) }
+    fun onEdadChanged(edad: Int) =
+        actualizar { copy(edad = edad, error = null, errores = errores.copy(edad = null)) }
 
-    fun onEmailChanged(email: String) = actualizar { copy(email = email.trim(), error = null) }
+    fun onEmailChanged(email: String) =
+        actualizar { copy(email = email.trim(), error = null, errores = errores.copy(email = null)) }
 
-    fun onContraseñaChanged(contraseña: String) = actualizar { copy(contraseña = contraseña, error = null) }
+    fun onContraseñaChanged(contraseña: String) =
+        actualizar { copy(contraseña = contraseña, error = null, errores = errores.copy(contraseña = null)) }
+
+    fun cerrarDialogo() = actualizar { copy(dialogo = null) }
 
     fun onCodigoDigitChanged(posicion: Int, digito: String) {
         if (posicion !in 0 until LONGITUD_CODIGO) return
@@ -108,8 +122,9 @@ class AuthViewModel @Inject constructor(
     fun enviarFormularioRegistro() {
         val estado = _registerState.value
         if (estado.isLoading) return
-        validarPaso1(estado)?.let { mensaje ->
-            actualizar { copy(error = mensaje) }
+        val erroresValidacion = validarPaso1(estado)
+        if (erroresValidacion.hayErrores) {
+            actualizar { copy(errores = erroresValidacion, dialogo = dialogoPara(estado, erroresValidacion)) }
             return
         }
 
@@ -127,7 +142,14 @@ class AuthViewModel @Inject constructor(
                     actualizarCodigoDePrueba(estado.email)
                     iniciarCuentaRegresiva()
                 }
-                is AuthResult.Error -> actualizar { copy(error = r.message) }
+                is AuthResult.Error -> actualizar {
+                    if (r.message.startsWith("Ya existe")) {
+                        // El correo ya está registrado: se marca el campo, sin diálogo
+                        copy(errores = errores.copy(email = r.message))
+                    } else {
+                        copy(error = r.message, dialogo = DialogoAuth.ERROR_SERVIDOR)
+                    }
+                }
                 is AuthResult.Loading -> Unit
             }
         }
@@ -228,7 +250,9 @@ class AuthViewModel @Inject constructor(
             2 -> {
                 cuentaRegresivaJob?.cancel()
                 _codigoDePrueba.value = null
-                actualizar { copy(pasoActual = 1, codigoVerificacion = "", tiempoReenvio = 0, error = null) }
+                actualizar {
+                    copy(pasoActual = 1, codigoVerificacion = "", tiempoReenvio = 0, error = null, dialogo = null)
+                }
             }
             3 -> actualizar { copy(pasoActual = 2, error = null) }
         }
@@ -250,11 +274,13 @@ class AuthViewModel @Inject constructor(
     fun onLoginEmailChanged(email: String) {
         _loginEmail.value = email.trim()
         _error.value = null
+        _erroresLogin.update { it.copy(email = null) }
     }
 
     fun onLoginPasswordChanged(password: String) {
         _loginPassword.value = password
         _error.value = null
+        _erroresLogin.update { it.copy(contraseña = null) }
     }
 
     fun togglePasswordVisibility() {
@@ -269,19 +295,22 @@ class AuthViewModel @Inject constructor(
         if (_isLoading.value) return
         val email = _loginEmail.value
         val password = _loginPassword.value
-        when {
-            !Patterns.EMAIL_ADDRESS.matcher(email).matches() -> {
-                _error.value = "Ingresa un email válido."
-                return
-            }
-            password.isEmpty() -> {
-                _error.value = "Ingresa tu contraseña."
-                return
-            }
+        val erroresCampos = ErroresLogin(
+            email = when {
+                email.isEmpty() -> OBLIGATORIO
+                !Patterns.EMAIL_ADDRESS.matcher(email).matches() -> "Correo incorrecto."
+                else -> null
+            },
+            contraseña = if (password.isEmpty()) OBLIGATORIO else null,
+        )
+        if (erroresCampos.email != null || erroresCampos.contraseña != null) {
+            _erroresLogin.value = erroresCampos
+            return
         }
 
         _isLoading.value = true
         _error.value = null
+        _erroresLogin.value = ErroresLogin()
         viewModelScope.launch {
             try {
                 when (val r = authRepository.login(email, password)) {
@@ -296,7 +325,11 @@ class AuthViewModel @Inject constructor(
                         _loginPasswordVisible.value = false
                         _isAuthenticated.value = true
                     }
-                    is AuthResult.Error -> _error.value = r.message
+                    // El repositorio solo falla en el login por credenciales: se marcan ambos campos
+                    is AuthResult.Error -> _erroresLogin.value = ErroresLogin(
+                        email = "Correo incorrecto.",
+                        contraseña = "Contraseña incorrecta.",
+                    )
                     is AuthResult.Loading -> Unit
                 }
             } finally {
@@ -312,6 +345,7 @@ class AuthViewModel @Inject constructor(
         _loginPassword.value = ""
         _loginPasswordVisible.value = false
         _error.value = null
+        _erroresLogin.value = ErroresLogin()
         resetRegistro()
         loadRememberedEmail()
     }
@@ -332,16 +366,41 @@ class AuthViewModel @Inject constructor(
 
     fun limpiarError() {
         _error.value = null
+        _erroresLogin.value = ErroresLogin()
     }
 
     // ============================== INTERNOS ==============================
 
-    private fun validarPaso1(estado: RegisterState): String? = when {
-        estado.nombre.trim().length < NOMBRE_MINIMO -> "El nombre debe tener al menos $NOMBRE_MINIMO caracteres."
-        estado.edad !in EDAD_MINIMA..EDAD_MAXIMA -> "La edad debe estar entre $EDAD_MINIMA y $EDAD_MAXIMA años."
-        !Patterns.EMAIL_ADDRESS.matcher(estado.email).matches() -> "Ingresa un email válido."
-        estado.contraseña.length < CONTRASENA_MINIMA ->
-            "La contraseña debe tener al menos $CONTRASENA_MINIMA caracteres."
+    /** Un mensaje por campo con problema (los textos son los del diseño). */
+    private fun validarPaso1(estado: RegisterState): ErroresPaso1 = ErroresPaso1(
+        nombre = when {
+            estado.nombre.isBlank() -> OBLIGATORIO
+            estado.nombre.trim().length < NOMBRE_MINIMO -> "Prueba con otro nombre."
+            else -> null
+        },
+        edad = when {
+            estado.edad == 0 -> OBLIGATORIO
+            estado.edad !in EDAD_MINIMA..EDAD_MAXIMA -> "Introduce una edad válida."
+            else -> null
+        },
+        email = when {
+            estado.email.isEmpty() -> OBLIGATORIO
+            !Patterns.EMAIL_ADDRESS.matcher(estado.email).matches() -> "Correo incorrecto."
+            else -> null
+        },
+        contraseña = when {
+            estado.contraseña.isEmpty() -> OBLIGATORIO
+            estado.contraseña.length < CONTRASENA_MINIMA -> "Contraseña incorrecta."
+            else -> null
+        },
+    )
+
+    /** Qué diálogo acompaña a los errores: campos vacíos > correo > contraseña; nombre/edad solo van bajo el campo. */
+    private fun dialogoPara(estado: RegisterState, errores: ErroresPaso1): DialogoAuth? = when {
+        estado.nombre.isBlank() || estado.edad == 0 || estado.email.isEmpty() || estado.contraseña.isEmpty() ->
+            DialogoAuth.VALIDACION
+        errores.email != null -> DialogoAuth.CORREO_INVALIDO
+        errores.contraseña != null -> DialogoAuth.CONTRASENA_DEBIL
         else -> null
     }
 
@@ -363,14 +422,16 @@ class AuthViewModel @Inject constructor(
     }
 
     private fun ejecutarRegistro(bloque: suspend () -> Unit) {
-        actualizar { copy(isLoading = true, error = null) }
+        actualizar { copy(isLoading = true, error = null, dialogo = null) }
         viewModelScope.launch {
             try {
                 bloque()
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e
                 Timber.e(e, "Error en el registro")
-                actualizar { copy(error = "Ocurrió un error inesperado. Inténtalo de nuevo.") }
+                actualizar {
+                    copy(error = "Ocurrió un error inesperado. Inténtalo de nuevo.", dialogo = DialogoAuth.ERROR_SERVIDOR)
+                }
             } finally {
                 actualizar { copy(isLoading = false) }
             }
@@ -389,5 +450,6 @@ class AuthViewModel @Inject constructor(
         const val EDAD_MINIMA = 13
         const val EDAD_MAXIMA = 120
         const val CONTRASENA_MINIMA = 8
+        const val OBLIGATORIO = "Este campo es obligatorio."
     }
 }

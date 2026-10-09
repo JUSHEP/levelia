@@ -95,21 +95,18 @@ fun NavGraph(
         composable(Destinations.LoginScreen.route) {
             val email by authViewModel.loginEmail.collectAsStateWithLifecycle()
             val password by authViewModel.loginPassword.collectAsStateWithLifecycle()
-            val passwordVisible by authViewModel.loginPasswordVisible.collectAsStateWithLifecycle()
             val rememberMe by authViewModel.rememberMe.collectAsStateWithLifecycle()
             val isLoading by authViewModel.isLoading.collectAsStateWithLifecycle()
-            val error by authViewModel.error.collectAsStateWithLifecycle()
+            val erroresLogin by authViewModel.erroresLogin.collectAsStateWithLifecycle()
 
             LoginScreen(
                 email = email,
                 password = password,
-                passwordVisible = passwordVisible,
                 rememberMe = rememberMe,
                 isLoading = isLoading,
-                error = error,
+                errores = erroresLogin,
                 onEmailChanged = authViewModel::onLoginEmailChanged,
                 onPasswordChanged = authViewModel::onLoginPasswordChanged,
-                onTogglePasswordVisibility = authViewModel::togglePasswordVisibility,
                 onRememberMeChanged = authViewModel::onRememberMeChanged,
                 onLogin = authViewModel::login,
                 onRegisterClick = {
@@ -129,6 +126,7 @@ fun NavGraph(
                 onEmailChanged = authViewModel::onEmailChanged,
                 onContraseñaChanged = authViewModel::onContraseñaChanged,
                 onCrearCuenta = authViewModel::enviarFormularioRegistro,
+                onCerrarDialogo = authViewModel::cerrarDialogo,
                 onBack = { navController.popBackStack() },
             )
         }
