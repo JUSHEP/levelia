@@ -6,7 +6,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.levelia.levelia.R
 import com.levelia.levelia.domain.models.DialogoAuth
@@ -91,7 +90,7 @@ fun RegisterStep1Screen(
             error = state.errores.contraseña,
             enabled = habilitado,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-            visualTransformation = PasswordVisualTransformation(),
+            esContrasena = true,
         )
 
         Spacer(Modifier.height(24.dp))

@@ -113,6 +113,15 @@ class AuthRepository @Inject constructor() {
         }
     }
 
+    /**
+     * Recuperar contraseña (simulado). Siempre responde éxito, exista o no el correo, para no revelar
+     * qué correos están registrados. TODO: con backend real, enviar el correo de restablecimiento.
+     */
+    suspend fun solicitarRecuperacion(email: String): AuthResult<Unit> {
+        delay(1000)
+        return AuthResult.Success(Unit)
+    }
+
     /** Solo para pruebas: sin envío real de emails, la UI de debug muestra el código. */
     fun debugPendingCode(email: String): String? = pendingCodes[normalizar(email)]
 

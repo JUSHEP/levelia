@@ -71,6 +71,17 @@ class AuthViewModel @Inject constructor(
     private val _erroresLogin = MutableStateFlow(ErroresLogin())
     val erroresLogin: StateFlow<ErroresLogin> = _erroresLogin.asStateFlow()
 
+    // --- Recuperar contraseña ---
+
+    private val _recuperarEmail = MutableStateFlow("")
+    val recuperarEmail: StateFlow<String> = _recuperarEmail.asStateFlow()
+
+    private val _recuperarError = MutableStateFlow<String?>(null)
+    val recuperarError: StateFlow<String?> = _recuperarError.asStateFlow()
+
+    private val _recuperarLoading = MutableStateFlow(false)
+    val recuperarLoading: StateFlow<Boolean> = _recuperarLoading.asStateFlow()
+
     private var cuentaRegresivaJob: Job? = null
 
     init {
@@ -362,6 +373,46 @@ class AuthViewModel @Inject constructor(
         val email = authRepository.getRememberedEmail()
         _loginEmail.value = email.orEmpty()
         _rememberMe.value = email != null
+    }
+
+    /** Al abrir "Recupera tu contraseña": arranca con el correo del login si ya lo escribió. */
+    fun iniciarRecuperacion() {
+        _recuperarEmail.value = _loginEmail.value
+        _recuperarError.value = null
+        _recuperarLoading.value = false
+    }
+
+    fun onRecuperarEmailChanged(email: String) {
+        _recuperarEmail.value = email.trim()
+        _recuperarError.value = null
+    }
+
+    /** [onEnviado] se llama en el hilo principal cuando la solicitud salió bien. */
+    fun enviarRecuperacion(onEnviado: () -> Unit) {
+        if (_recuperarLoading.value) return
+        val email = _recuperarEmail.value
+        _recuperarError.value = when {
+            email.isEmpty() -> OBLIGATORIO
+            !Patterns.EMAIL_ADDRESS.matcher(email).matches() -> "Correo incorrecto."
+            else -> null
+        }
+        if (_recuperarError.value != null) return
+
+        _recuperarLoading.value = true
+        viewModelScope.launch {
+            try {
+                when (val r = authRepository.solicitarRecuperacion(email)) {
+                    is AuthResult.Success -> onEnviado()
+                    is AuthResult.Error -> _recuperarError.value = r.message
+                    is AuthResult.Loading -> Unit
+                }
+            } catch (e: Exception) {
+                Timber.e(e, "Error al solicitar la recuperación")
+                _recuperarError.value = "No pudimos enviar el correo. Inténtalo más tarde."
+            } finally {
+                _recuperarLoading.value = false
+            }
+        }
     }
 
     fun limpiarError() {

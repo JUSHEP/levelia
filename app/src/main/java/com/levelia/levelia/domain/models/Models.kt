@@ -64,6 +64,8 @@ sealed class Destinations(val route: String) {
     data object RegisterStep2Screen : Destinations("register_step2")
     data object RegisterStep3Screen : Destinations("register_step3")
     data object RegisterStep4Screen : Destinations("register_step4")
+    data object RecoverPasswordScreen : Destinations("recover_password")
+    data object CheckEmailScreen : Destinations("check_email")
     data object HomeScreen : Destinations("home")
 }
 
