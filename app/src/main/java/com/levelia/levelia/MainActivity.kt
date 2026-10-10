@@ -6,12 +6,15 @@ import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.levelia.levelia.presentation.navigation.NavGraph
+import com.levelia.levelia.presentation.screens.SinConexionScreen
+import com.levelia.levelia.presentation.screens.components.rememberEstadoConexion
 import com.levelia.levelia.presentation.viewmodel.AuthViewModel
 import com.levelia.levelia.ui.theme.LeveliaTheme
 import dagger.hilt.android.AndroidEntryPoint
@@ -37,7 +40,14 @@ class MainActivity : ComponentActivity() {
                     color = MaterialTheme.colorScheme.background,
                     contentColor = MaterialTheme.colorScheme.onBackground,
                 ) {
-                    NavGraph(authViewModel = authViewModel)
+                    val conexion = rememberEstadoConexion()
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        NavGraph(authViewModel = authViewModel)
+                        // Sin internet, la pantalla "Sin conexión" tapa la app hasta que vuelva
+                        if (!conexion.hayConexion) {
+                            SinConexionScreen(onReintentar = conexion::revisar)
+                        }
+                    }
                 }
             }
         }

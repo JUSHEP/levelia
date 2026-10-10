@@ -63,13 +63,17 @@ private fun TarjetaUsuario(user: UserData) {
     ) {
         Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Surface(
-                    shape = CircleShape,
-                    color = colorAvatar.copy(alpha = 0.2f),
-                    border = BorderStroke(3.dp, colorAvatar),
-                    modifier = Modifier.size(64.dp),
-                ) {
-                    Icon(Icons.Filled.Face, contentDescription = null, tint = colorAvatar, modifier = Modifier.padding(12.dp))
+                if (avatar != null) {
+                    AvatarImagen(avatar, modifier = Modifier.size(64.dp))
+                } else {
+                    Surface(
+                        shape = CircleShape,
+                        color = colorAvatar.copy(alpha = 0.2f),
+                        border = BorderStroke(3.dp, colorAvatar),
+                        modifier = Modifier.size(64.dp),
+                    ) {
+                        Icon(Icons.Filled.Face, contentDescription = null, tint = colorAvatar, modifier = Modifier.padding(12.dp))
+                    }
                 }
                 Column(modifier = Modifier.padding(start = 16.dp)) {
                     Text(user.nombre, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)

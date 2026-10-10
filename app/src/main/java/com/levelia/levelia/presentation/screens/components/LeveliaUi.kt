@@ -33,11 +33,18 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -335,10 +342,15 @@ fun LeveliaTextField(
     enabled: Boolean = true,
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
     visualTransformation: VisualTransformation = VisualTransformation.None,
+    /** Si es true, oculta el texto y muestra el ojo para verlo / ocultarlo. */
+    esContrasena: Boolean = false,
 ) {
     val hayError = error != null
     val colorTexto = if (hayError) Color.White else TextoCampo
     val focus = remember { FocusRequester() }
+    var contrasenaVisible by remember { mutableStateOf(false) }
+    val transformacion =
+        if (esContrasena && !contrasenaVisible) PasswordVisualTransformation() else visualTransformation
 
     Column(modifier = modifier.fillMaxWidth()) {
         Box(
@@ -355,7 +367,7 @@ fun LeveliaTextField(
                 ) { focus.requestFocus() }
                 .padding(start = 16.dp, end = 16.dp, top = 10.dp),
         ) {
-            Column {
+            Column(modifier = Modifier.padding(end = if (esContrasena) 44.dp else 0.dp)) {
                 Text(
                     if (hayError) "*$label" else label,
                     color = if (hayError) Color.White else EtiquetaCampo,
@@ -370,7 +382,7 @@ fun LeveliaTextField(
                     textStyle = TextStyle(fontFamily = PlusJakartaSans, fontSize = 16.sp, color = colorTexto),
                     cursorBrush = SolidColor(colorTexto),
                     keyboardOptions = keyboardOptions,
-                    visualTransformation = visualTransformation,
+                    visualTransformation = transformacion,
                     modifier = Modifier.fillMaxWidth().focusRequester(focus),
                     decorationBox = { campo ->
                         Box(modifier = Modifier.padding(top = 3.dp)) {
@@ -381,6 +393,19 @@ fun LeveliaTextField(
                         }
                     },
                 )
+            }
+            if (esContrasena) {
+                IconButton(
+                    onClick = { contrasenaVisible = !contrasenaVisible },
+                    enabled = enabled,
+                    modifier = Modifier.align(Alignment.CenterEnd).size(40.dp),
+                ) {
+                    Icon(
+                        imageVector = if (contrasenaVisible) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                        contentDescription = if (contrasenaVisible) "Ocultar contraseña" else "Mostrar contraseña",
+                        tint = colorTexto,
+                    )
+                }
             }
         }
         if (error != null) {

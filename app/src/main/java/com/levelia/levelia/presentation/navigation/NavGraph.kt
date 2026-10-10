@@ -16,8 +16,10 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.levelia.levelia.domain.models.Destinations
+import com.levelia.levelia.presentation.screens.CheckEmailScreen
 import com.levelia.levelia.presentation.screens.HomeScreen
 import com.levelia.levelia.presentation.screens.LoginScreen
+import com.levelia.levelia.presentation.screens.RecoverPasswordScreen
 import com.levelia.levelia.presentation.screens.RegisterStep1Screen
 import com.levelia.levelia.presentation.screens.RegisterStep2Screen
 import com.levelia.levelia.presentation.screens.RegisterStep3Screen
@@ -114,6 +116,40 @@ fun NavGraph(
                     authViewModel.resetRegistro()
                     navController.navigate(Destinations.RegisterStep1Screen.route)
                 },
+                onForgotPasswordClick = {
+                    authViewModel.iniciarRecuperacion()
+                    navController.navigate(Destinations.RecoverPasswordScreen.route)
+                },
+            )
+        }
+
+        composable(Destinations.RecoverPasswordScreen.route) {
+            val email by authViewModel.recuperarEmail.collectAsStateWithLifecycle()
+            val error by authViewModel.recuperarError.collectAsStateWithLifecycle()
+            val cargando by authViewModel.recuperarLoading.collectAsStateWithLifecycle()
+            RecoverPasswordScreen(
+                email = email,
+                error = error,
+                isLoading = cargando,
+                onEmailChanged = authViewModel::onRecuperarEmailChanged,
+                onEnviar = {
+                    authViewModel.enviarRecuperacion {
+                        navController.navigate(Destinations.CheckEmailScreen.route)
+                    }
+                },
+                onBack = { navController.popBackStack() },
+            )
+        }
+
+        composable(Destinations.CheckEmailScreen.route) {
+            val email by authViewModel.recuperarEmail.collectAsStateWithLifecycle()
+            CheckEmailScreen(
+                email = email,
+                onVolverAlLogin = {
+                    // Vuelve al login saltándose la pantalla de recuperar
+                    navController.popBackStack(Destinations.LoginScreen.route, inclusive = false)
+                },
+                onBack = { navController.popBackStack() },
             )
         }
 
