@@ -69,4 +69,4 @@ sealed class Destinations(val route: String) {
     data object HomeScreen : Destinations("home")
 }
 
-enum class Avatar { AVATAR_1, AVATAR_2, AVATAR_3 }
+enum class Avatar { AVATAR_1, AVATAR_2, AVATAR_3, AVATAR_4, AVATAR_5, AVATAR_6 }
