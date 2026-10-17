@@ -15,16 +15,27 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.levelia.levelia.domain.ReglasPerfil
 import com.levelia.levelia.domain.models.Destinations
-import com.levelia.levelia.presentation.screens.CheckEmailScreen
+import com.levelia.levelia.domain.models.TipoDialogoPerfil
+import com.levelia.levelia.presentation.screens.CambiarAvatarScreen
+import com.levelia.levelia.presentation.screens.CambiarContrasenaScreen
+import com.levelia.levelia.presentation.screens.RecoverCodeScreen
+import com.levelia.levelia.presentation.screens.CuentaEliminadaScreen
+import com.levelia.levelia.presentation.screens.EditarNombreScreen
 import com.levelia.levelia.presentation.screens.HomeScreen
 import com.levelia.levelia.presentation.screens.LoginScreen
+import com.levelia.levelia.presentation.screens.PerfilScreen
 import com.levelia.levelia.presentation.screens.RecoverPasswordScreen
+import com.levelia.levelia.presentation.screens.RestablecerContrasenaScreen
 import com.levelia.levelia.presentation.screens.RegisterStep1Screen
 import com.levelia.levelia.presentation.screens.RegisterStep2Screen
 import com.levelia.levelia.presentation.screens.RegisterStep3Screen
 import com.levelia.levelia.presentation.screens.RegisterStep4Screen
+import com.levelia.levelia.presentation.screens.components.LeveliaBackground
+import com.levelia.levelia.presentation.screens.components.TabInferior
 import com.levelia.levelia.presentation.viewmodel.AuthViewModel
+import com.levelia.levelia.presentation.viewmodel.PerfilViewModel
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 
@@ -38,15 +49,41 @@ private val RUTAS_REGISTRO = listOf(
 
 private const val DURACION_TRANSICION = 300
 
+// Pantallas que solo se ven con sesión iniciada
+private val RUTAS_PROTEGIDAS = listOf(
+    Destinations.HomeScreen.route,
+    Destinations.PerfilScreen.route,
+    Destinations.EditarNombreScreen.route,
+    Destinations.CambiarAvatarScreen.route,
+    Destinations.CambiarContrasenaScreen.route,
+)
+
 /**
- * [authViewModel] debe crearse fuera del NavHost (ver MainActivity): si cada destino llamara a
- * hiltViewModel() tendría su propia instancia y el estado del registro se perdería entre pasos.
+ * [authViewModel] y [perfilViewModel] deben crearse fuera del NavHost (ver MainActivity): si cada
+ * destino llamara a hiltViewModel() tendría su propia instancia y el estado se perdería entre pantallas.
  */
 @Composable
 fun NavGraph(
     authViewModel: AuthViewModel,
+    perfilViewModel: PerfilViewModel,
     modifier: Modifier = Modifier,
     navController: NavHostController = rememberNavController(),
+) {
+    // Mientras se revisa si quedó una sesión guardada se muestra solo el fondo, para no parpadear el login
+    val restaurando by authViewModel.restaurandoSesion.collectAsStateWithLifecycle()
+    if (restaurando) {
+        LeveliaBackground {}
+    } else {
+        NavGraphContenido(authViewModel, perfilViewModel, modifier, navController)
+    }
+}
+
+@Composable
+private fun NavGraphContenido(
+    authViewModel: AuthViewModel,
+    perfilViewModel: PerfilViewModel,
+    modifier: Modifier,
+    navController: NavHostController,
 ) {
     // Se calcula una sola vez: cambiar startDestination después de construir el grafo lo reconstruye
     val startDestination = remember {
@@ -74,13 +111,35 @@ fun NavGraph(
     // Login exitoso / "Empezar" del paso 4 → Home; logout → Login. Ambos vacían el back stack.
     LaunchedEffect(navController, authViewModel) {
         authViewModel.isAuthenticated.collect { autenticado ->
+            // Sin sesión no debe quedar nada del usuario anterior en el módulo Perfil
+            if (!autenticado) perfilViewModel.limpiar()
             val rutaActual = navController.currentDestination?.route ?: return@collect
             if (autenticado && rutaActual != Destinations.HomeScreen.route) {
                 navController.navigateToHomeClear()
                 // Después de navegar: con Home en pantalla, el reset no dispara la sincronización de pasos
                 authViewModel.resetRegistro()
-            } else if (!autenticado && rutaActual == Destinations.HomeScreen.route) {
+            } else if (!autenticado && rutaActual in RUTAS_PROTEGIDAS) {
                 navController.navigateToLoginClear()
+            }
+        }
+    }
+
+    // Lo que cambia el Perfil (nombre, avatar) se copia a la sesión para que Home lo muestre al volver
+    LaunchedEffect(authViewModel, perfilViewModel) {
+        perfilViewModel.perfil
+            .map { it.usuario }
+            .distinctUntilChanged()
+            .collect { usuario ->
+                if (usuario != null && authViewModel.isAuthenticated.value) authViewModel.actualizarUsuario(usuario)
+            }
+    }
+
+    // Cuenta eliminada: primero se abre "Cuenta eliminada" y después se cierra la sesión local
+    LaunchedEffect(navController, authViewModel, perfilViewModel) {
+        perfilViewModel.cuentaEliminada.collect { eliminada ->
+            if (eliminada) {
+                navController.navigateToCuentaEliminadaClear()
+                authViewModel.logout()
             }
         }
     }
@@ -134,22 +193,61 @@ fun NavGraph(
                 onEmailChanged = authViewModel::onRecuperarEmailChanged,
                 onEnviar = {
                     authViewModel.enviarRecuperacion {
-                        navController.navigate(Destinations.CheckEmailScreen.route)
+                        navController.navigate(Destinations.RecoverCodeScreen.route)
+                    }
+                },
+                onRegistrate = {
+                    authViewModel.resetRegistro()
+                    navController.navigate(Destinations.RegisterStep1Screen.route) {
+                        popUpTo(Destinations.LoginScreen.route) { inclusive = false }
                     }
                 },
                 onBack = { navController.popBackStack() },
             )
         }
 
-        composable(Destinations.CheckEmailScreen.route) {
+        composable(Destinations.RecoverCodeScreen.route) {
             val email by authViewModel.recuperarEmail.collectAsStateWithLifecycle()
-            CheckEmailScreen(
+            val estado by authViewModel.recuperacion.collectAsStateWithLifecycle()
+            RecoverCodeScreen(
                 email = email,
-                onVolverAlLogin = {
-                    // Vuelve al login saltándose la pantalla de recuperar
-                    navController.popBackStack(Destinations.LoginScreen.route, inclusive = false)
+                state = estado,
+                onCodigoDigitChanged = authViewModel::onRecuperarCodigoChanged,
+                onVerificar = {
+                    authViewModel.verificarCodigoRecuperacion {
+                        // Sin volver atrás al código: ya se usó
+                        navController.navigate(Destinations.RestablecerContrasenaScreen.route) {
+                            popUpTo(Destinations.LoginScreen.route) { inclusive = false }
+                        }
+                    }
                 },
+                onReenviar = authViewModel::reenviarCodigoRecuperacion,
                 onBack = { navController.popBackStack() },
+            )
+        }
+
+        composable(Destinations.RestablecerContrasenaScreen.route) {
+            val estado by authViewModel.recuperacion.collectAsStateWithLifecycle()
+            val salirAlLogin = {
+                authViewModel.cancelarRecuperacion()
+                navController.popBackStack(Destinations.LoginScreen.route, inclusive = false)
+            }
+            BackHandler(enabled = !estado.cargando) { salirAlLogin() }
+            RestablecerContrasenaScreen(
+                state = estado,
+                requisitos = ReglasPerfil.requisitosContrasena(estado.nueva),
+                onNuevaChanged = authViewModel::onRecuperarNuevaChanged,
+                onConfirmarChanged = authViewModel::onRecuperarConfirmarChanged,
+                onGuardar = authViewModel::restablecerContrasena,
+                onCancelar = { salirAlLogin() },
+                onCerrarDialogo = {
+                    // Tras "Contraseña actualizada" se vuelve al login; los demás avisos solo se cierran
+                    if (estado.dialogo?.tipo == TipoDialogoPerfil.CONTRASENA_ACTUALIZADA) {
+                        salirAlLogin()
+                    } else {
+                        authViewModel.cerrarDialogoRecuperacion()
+                    }
+                },
             )
         }
 
@@ -201,8 +299,128 @@ fun NavGraph(
 
         composable(Destinations.HomeScreen.route) {
             val user by authViewModel.user.collectAsStateWithLifecycle()
-            HomeScreen(user = user, onLogout = authViewModel::logout)
+            HomeScreen(
+                user = user,
+                onLogout = authViewModel::logout,
+                onTab = { navController.irATab(it) },
+            )
         }
+
+        // ------------------------------- Módulo Perfil -------------------------------
+
+        composable(Destinations.PerfilScreen.route) {
+            val perfil by perfilViewModel.perfil.collectAsStateWithLifecycle()
+            val dialogo by perfilViewModel.dialogo.collectAsStateWithLifecycle()
+            val usuarioSesion by authViewModel.user.collectAsStateWithLifecycle()
+
+            // Cada vez que se abre Perfil se vuelve a leer de la base de datos
+            LaunchedEffect(Unit) { perfilViewModel.cargarPerfil(usuarioSesion) }
+
+            PerfilScreen(
+                perfil = perfil,
+                dialogo = dialogo,
+                // El menú (hamburguesa) del diseño todavía no tiene destino: no hace nada
+                onMenu = {},
+                onEditarNombre = {
+                    perfilViewModel.iniciarEditarNombre()
+                    navController.navigate(Destinations.EditarNombreScreen.route)
+                },
+                onCambiarAvatar = {
+                    perfilViewModel.iniciarCambiarAvatar()
+                    navController.navigate(Destinations.CambiarAvatarScreen.route)
+                },
+                onCambiarContrasena = {
+                    perfilViewModel.iniciarCambiarContrasena()
+                    navController.navigate(Destinations.CambiarContrasenaScreen.route)
+                },
+                onEliminarCuenta = perfilViewModel::solicitarEliminarCuenta,
+                onConfirmarEliminar = perfilViewModel::confirmarEliminarCuenta,
+                onCerrarDialogo = perfilViewModel::cerrarDialogo,
+                onTab = { navController.irATab(it) },
+            )
+        }
+
+        composable(Destinations.EditarNombreScreen.route) {
+            val perfil by perfilViewModel.perfil.collectAsStateWithLifecycle()
+            val estado by perfilViewModel.editarNombre.collectAsStateWithLifecycle()
+            val dialogo by perfilViewModel.dialogo.collectAsStateWithLifecycle()
+            EditarNombreScreen(
+                nombreActual = perfil.usuario?.nombre.orEmpty(),
+                avatarActual = perfil.usuario?.avatar.orEmpty(),
+                state = estado,
+                dialogo = dialogo,
+                onNuevoNombreChanged = perfilViewModel::onNuevoNombreChanged,
+                onGuardar = { perfilViewModel.guardarNombre { navController.popBackStack() } },
+                onCancelar = { navController.popBackStack() },
+                onCerrarDialogo = perfilViewModel::cerrarDialogo,
+                onTab = { navController.irATab(it) },
+            )
+        }
+
+        composable(Destinations.CambiarAvatarScreen.route) {
+            val perfil by perfilViewModel.perfil.collectAsStateWithLifecycle()
+            val estado by perfilViewModel.cambiarAvatar.collectAsStateWithLifecycle()
+            val dialogo by perfilViewModel.dialogo.collectAsStateWithLifecycle()
+            CambiarAvatarScreen(
+                avatarActual = perfil.usuario?.avatar.orEmpty(),
+                state = estado,
+                dialogo = dialogo,
+                onAvatarSeleccionado = perfilViewModel::onAvatarSeleccionado,
+                onGuardar = { perfilViewModel.guardarAvatar { navController.popBackStack() } },
+                onCancelar = { navController.popBackStack() },
+                onCerrarDialogo = perfilViewModel::cerrarDialogo,
+                onTab = { navController.irATab(it) },
+            )
+        }
+
+        composable(Destinations.CambiarContrasenaScreen.route) {
+            val estado by perfilViewModel.contrasena.collectAsStateWithLifecycle()
+            val dialogo by perfilViewModel.dialogo.collectAsStateWithLifecycle()
+            CambiarContrasenaScreen(
+                state = estado,
+                requisitos = perfilViewModel.requisitos(estado.nueva),
+                dialogo = dialogo,
+                onActualChanged = perfilViewModel::onContrasenaActualChanged,
+                onNuevaChanged = perfilViewModel::onContrasenaNuevaChanged,
+                onConfirmarChanged = perfilViewModel::onContrasenaConfirmarChanged,
+                onGuardar = perfilViewModel::guardarContrasena,
+                onCancelar = { navController.popBackStack() },
+                onCerrarDialogo = {
+                    // Tras "Contraseña actualizada" se vuelve a Perfil; los demás avisos solo se cierran
+                    val fueExito = dialogo?.tipo == TipoDialogoPerfil.CONTRASENA_ACTUALIZADA
+                    perfilViewModel.cerrarDialogo()
+                    if (fueExito) navController.popBackStack()
+                },
+                onTab = { navController.irATab(it) },
+            )
+        }
+
+        composable(Destinations.CuentaEliminadaScreen.route) {
+            // La cuenta ya no existe: "atrás" no hace nada, solo se sale con "Volver al inicio"
+            BackHandler {}
+            CuentaEliminadaScreen(onVolverAlInicio = { navController.navigateToLoginClear() })
+        }
+    }
+}
+
+/** Barra inferior: solo Inicio y Perfil tienen pantalla por ahora; las demás pestañas no hacen nada. */
+private fun NavHostController.irATab(tab: TabInferior) {
+    val destino = when (tab) {
+        TabInferior.INICIO -> Destinations.HomeScreen.route
+        TabInferior.PERFIL -> Destinations.PerfilScreen.route
+        else -> return
+    }
+    if (currentDestination?.route == destino) return
+    navigate(destino) {
+        popUpTo(Destinations.HomeScreen.route) { inclusive = false }
+        launchSingleTop = true
+    }
+}
+
+private fun NavHostController.navigateToCuentaEliminadaClear() {
+    navigate(Destinations.CuentaEliminadaScreen.route) {
+        popUpTo(graph.id) { inclusive = true }
+        launchSingleTop = true
     }
 }
 

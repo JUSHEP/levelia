@@ -97,7 +97,7 @@ fun RegisterStep2Screen(
 }
 
 @Composable
-private fun CodigoOtp(
+internal fun CodigoOtp(
     codigo: String,
     habilitado: Boolean,
     onDigitChanged: (Int, String) -> Unit,
@@ -140,4 +140,4 @@ private fun CodigoOtp(
     }
 }
 
-private fun formatearTiempo(segundos: Int) = "%02d:%02d".format(segundos / 60, segundos % 60)
+internal fun formatearTiempo(segundos: Int) = "%02d:%02d".format(segundos / 60, segundos % 60)
