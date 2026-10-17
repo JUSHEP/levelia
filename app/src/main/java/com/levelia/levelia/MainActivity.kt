@@ -16,6 +16,7 @@ import com.levelia.levelia.presentation.navigation.NavGraph
 import com.levelia.levelia.presentation.screens.SinConexionScreen
 import com.levelia.levelia.presentation.screens.components.rememberEstadoConexion
 import com.levelia.levelia.presentation.viewmodel.AuthViewModel
+import com.levelia.levelia.presentation.viewmodel.PerfilViewModel
 import com.levelia.levelia.ui.theme.LeveliaTheme
 import dagger.hilt.android.AndroidEntryPoint
 
@@ -32,6 +33,7 @@ class MainActivity : ComponentActivity() {
             LeveliaTheme {
                 // Una sola instancia, ligada a la Activity y compartida por todas las pantallas
                 val authViewModel: AuthViewModel = hiltViewModel()
+                val perfilViewModel: PerfilViewModel = hiltViewModel()
 
                 // Sin Scaffold ni padding de barras: el fondo del diseño llega hasta los bordes y cada
                 // pantalla se encarga de dejar libre la barra de estado (ver LeveliaScreen)
@@ -42,7 +44,7 @@ class MainActivity : ComponentActivity() {
                 ) {
                     val conexion = rememberEstadoConexion()
                     Box(modifier = Modifier.fillMaxSize()) {
-                        NavGraph(authViewModel = authViewModel)
+                        NavGraph(authViewModel = authViewModel, perfilViewModel = perfilViewModel)
                         // Sin internet, la pantalla "Sin conexión" tapa la app hasta que vuelva
                         if (!conexion.hayConexion) {
                             SinConexionScreen(onReintentar = conexion::revisar)

@@ -19,7 +19,9 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
@@ -33,6 +35,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.CircularProgressIndicator
@@ -72,12 +75,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.levelia.levelia.R
 import com.levelia.levelia.ui.theme.BotonDialogoFin
+import com.levelia.levelia.ui.theme.BotonCancelar
 import com.levelia.levelia.ui.theme.BotonDialogoInicio
 import com.levelia.levelia.ui.theme.BotonVerdeFin
 import com.levelia.levelia.ui.theme.BotonVerdeInicio
@@ -160,13 +165,20 @@ enum class PieDePantalla {
 
     /** Pasto con el texto legal (registro). */
     PASTO_LEGAL,
+
+    /** Sin imagen abajo (módulo Perfil: ahí va la barra inferior). */
+    NINGUNO,
 }
 
 @DrawableRes
-private fun PieDePantalla.recurso(): Int = when (this) {
+private fun PieDePantalla.recurso(): Int? = when (this) {
     PieDePantalla.BANNER -> R.drawable.bg_banner_nivel
     PieDePantalla.PASTO_LEGAL -> R.drawable.bg_pasto
+    PieDePantalla.NINGUNO -> null
 }
+
+/** Alto de la barra de navegación inferior (la pestaña seleccionada es la más alta). */
+val ALTO_BARRA_INFERIOR = 74.dp
 
 /**
  * Pantalla completa del diseño: fondo, pie de pasto/banner abajo, flecha atrás e indicador de paso
@@ -179,37 +191,53 @@ fun LeveliaScreen(
     onBack: (() -> Unit)? = null,
     indicadorPaso: String? = null,
     espacioSuperior: Dp = 80.dp,
+    margenHorizontal: Dp = 43.dp,
+    /** Si no es null, la esquina superior izquierda muestra el botón de menú (hamburguesa) en vez de la flecha. */
+    onMenu: (() -> Unit)? = null,
+    /** Barra de navegación fija abajo (módulo Perfil / Home). */
+    barraInferior: (@Composable BoxScope.() -> Unit)? = null,
     decoracion: @Composable BoxScope.() -> Unit = {},
     overlay: @Composable BoxScope.() -> Unit = {},
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    val imagenPie = ImageBitmap.imageResource(pie.recurso())
-    val proporcionPie = imagenPie.height.toFloat() / imagenPie.width
-    val altoPie = (LocalConfiguration.current.screenWidthDp * proporcionPie).dp
+    val imagenPie = pie.recurso()?.let { ImageBitmap.imageResource(it) }
+    val altoPie = if (imagenPie == null) {
+        0.dp
+    } else {
+        val proporcionPie = imagenPie.height.toFloat() / imagenPie.width
+        (LocalConfiguration.current.screenWidthDp * proporcionPie).dp
+    }
+    val altoBarra = if (barraInferior == null) {
+        0.dp
+    } else {
+        ALTO_BARRA_INFERIOR + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    }
 
     LeveliaBackground(modifier = modifier) {
         decoracion()
 
         // Pie fijo abajo; el teclado lo tapa en vez de empujarlo
-        Box(modifier = Modifier.align(Alignment.BottomCenter)) {
-            Image(
-                bitmap = imagenPie,
-                contentDescription = null,
-                contentScale = ContentScale.FillWidth,
-                filterQuality = FilterQuality.None,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            if (pie == PieDePantalla.PASTO_LEGAL) {
-                Text(
-                    "Al registrarte aceptas nuestros\nTérminos y Política de privacidad.",
-                    color = Color.White,
-                    fontSize = 13.sp,
-                    lineHeight = 18.sp,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(bottom = 64.dp),
+        if (imagenPie != null) {
+            Box(modifier = Modifier.align(Alignment.BottomCenter)) {
+                Image(
+                    bitmap = imagenPie,
+                    contentDescription = null,
+                    contentScale = ContentScale.FillWidth,
+                    filterQuality = FilterQuality.None,
+                    modifier = Modifier.fillMaxWidth(),
                 )
+                if (pie == PieDePantalla.PASTO_LEGAL) {
+                    Text(
+                        "Al registrarte aceptas nuestros\nTérminos y Política de privacidad.",
+                        color = Color.White,
+                        fontSize = 13.sp,
+                        lineHeight = 18.sp,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .padding(bottom = 64.dp),
+                    )
+                }
             }
         }
 
@@ -219,29 +247,37 @@ fun LeveliaScreen(
                 .imePadding()
                 .windowInsetsPadding(WindowInsets.statusBars)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 43.dp),
+                .padding(horizontal = margenHorizontal),
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth().padding(top = 12.dp).height(40.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                if (onBack != null) BotonAtras(onBack) else Spacer(Modifier.size(1.dp))
+                if (onBack != null) {
+                    BotonEsquina(Icons.AutoMirrored.Filled.ArrowBack, "Volver", onBack)
+                } else if (onMenu != null) {
+                    BotonEsquina(Icons.Filled.Menu, "Menú", onMenu)
+                } else {
+                    Spacer(Modifier.size(1.dp))
+                }
                 if (indicadorPaso != null) {
                     Text(indicadorPaso, color = Color.White, fontSize = 14.sp)
                 }
             }
             Spacer(Modifier.height(espacioSuperior))
             content()
-            Spacer(Modifier.height(altoPie + 16.dp))
+            Spacer(Modifier.height(altoPie + altoBarra + 16.dp))
         }
+
+        if (barraInferior != null) barraInferior()
 
         overlay()
     }
 }
 
 @Composable
-private fun BotonAtras(onClick: () -> Unit) {
+private fun BotonEsquina(icono: ImageVector, descripcion: String, onClick: () -> Unit) {
     Box(
         modifier = Modifier
             .size(40.dp)
@@ -251,8 +287,8 @@ private fun BotonAtras(onClick: () -> Unit) {
         contentAlignment = Alignment.Center,
     ) {
         Icon(
-            Icons.AutoMirrored.Filled.ArrowBack,
-            contentDescription = "Volver",
+            icono,
+            contentDescription = descripcion,
             tint = Color.White,
             modifier = Modifier.size(22.dp),
         )
@@ -265,14 +301,22 @@ private fun BotonAtras(onClick: () -> Unit) {
 
 /** Título pixel con el desplazamiento rosado del diseño. */
 @Composable
-fun TituloPixel(texto: String, tamano: TextUnit = 28.sp) {
+fun TituloPixel(
+    texto: String,
+    tamano: TextUnit = 28.sp,
+    textAlign: TextAlign = TextAlign.Unspecified,
+    interlineado: Float = 1.3f,
+    modifier: Modifier = Modifier,
+) {
     Text(
         texto,
         color = Color.White,
+        textAlign = textAlign,
+        modifier = modifier,
         style = TextStyle(
             fontFamily = PressStart2P,
             fontSize = tamano,
-            lineHeight = tamano * 1.3f,
+            lineHeight = tamano * interlineado,
             shadow = Shadow(color = SombraTitulo, offset = Offset(6f, 6f), blurRadius = 0f),
         ),
     )
@@ -499,8 +543,17 @@ fun LeveliaDialog(
     onEntendido: () -> Unit,
     modifier: Modifier = Modifier,
     textoBoton: String = "Entendido",
+    /** Alto del ícono; los íconos del módulo Perfil tienen otro tamaño que los de registro. */
+    altoIcono: Dp = 64.dp,
+    /** Color plano del botón principal (null = degradado verde de siempre). */
+    colorBoton: Color? = null,
+    /** Segundo botón opcional (p. ej. "Cancelar"), en morado oscuro bajo el principal. */
+    textoSecundario: String? = null,
+    onSecundario: (() -> Unit)? = null,
+    /** Qué hace el botón "atrás" del teléfono; por defecto lo mismo que el botón principal. */
+    onDescartar: (() -> Unit)? = null,
 ) {
-    BackHandler(onBack = onEntendido)
+    BackHandler(onBack = onDescartar ?: onEntendido)
 
     Box(
         modifier = modifier
@@ -537,7 +590,7 @@ fun LeveliaDialog(
                 contentDescription = null,
                 contentScale = ContentScale.Fit,
                 filterQuality = FilterQuality.None,
-                modifier = Modifier.padding(top = 22.dp, bottom = 18.dp).height(64.dp),
+                modifier = Modifier.padding(top = 22.dp, bottom = 18.dp).height(altoIcono),
             )
             Text(
                 mensaje,
@@ -551,9 +604,12 @@ fun LeveliaDialog(
                 modifier = Modifier
                     .padding(top = 18.dp)
                     .height(38.dp)
-                    .widthIn(min = 118.dp)
+                    .widthIn(min = if (colorBoton != null) 158.dp else 118.dp)
                     .clip(RoundedCornerShape(50))
-                    .background(Brush.horizontalGradient(listOf(BotonDialogoInicio, BotonDialogoFin)))
+                    .background(
+                        if (colorBoton != null) SolidColor(colorBoton)
+                        else Brush.horizontalGradient(listOf(BotonDialogoInicio, BotonDialogoFin)),
+                    )
                     .clickable(role = Role.Button, onClick = onEntendido)
                     .padding(horizontal = 24.dp),
                 contentAlignment = Alignment.Center,
@@ -565,6 +621,27 @@ fun LeveliaDialog(
                     fontWeight = FontWeight.Bold,
                     fontSize = 16.sp,
                 )
+            }
+            if (textoSecundario != null && onSecundario != null) {
+                Box(
+                    modifier = Modifier
+                        .padding(top = 14.dp)
+                        .height(38.dp)
+                        .widthIn(min = 158.dp)
+                        .clip(RoundedCornerShape(50))
+                        .background(BotonCancelar)
+                        .clickable(role = Role.Button, onClick = onSecundario)
+                        .padding(horizontal = 24.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        textoSecundario,
+                        color = Color.White,
+                        fontFamily = PlusJakartaSans,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp,
+                    )
+                }
             }
         }
     }

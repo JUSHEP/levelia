@@ -49,7 +49,7 @@ fun RegisterStep1Screen(
             }
         },
     ) {
-        TituloPixel("REGISTRATE")
+        TituloPixel("REGÍSTRATE")
         SubtituloAventura(prefijo = "Comienza tu ", destacado = "aventura")
 
         Spacer(Modifier.height(24.dp))
@@ -58,7 +58,7 @@ fun RegisterStep1Screen(
             label = "Nombre",
             value = state.nombre,
             onValueChange = onNombreChanged,
-            placeholder = "¿Como quieres que te llamemos?",
+            placeholder = "¿Cómo quieres que te llamemos?",
             error = state.errores.nombre,
             enabled = habilitado,
         )
@@ -86,7 +86,7 @@ fun RegisterStep1Screen(
             label = "Contraseña",
             value = state.contraseña,
             onValueChange = onContraseñaChanged,
-            placeholder = "minimo 8 caracteres",
+            placeholder = "Mínimo 8 caracteres",
             error = state.errores.contraseña,
             enabled = habilitado,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
