@@ -2,9 +2,13 @@ package com.levelia.levelia.presentation.screens
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -28,26 +32,38 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.levelia.levelia.domain.models.Avatar
 import com.levelia.levelia.domain.models.UserData
+import com.levelia.levelia.presentation.screens.components.ALTO_BARRA_INFERIOR
 import com.levelia.levelia.presentation.screens.components.AuthColumn
+import com.levelia.levelia.presentation.screens.components.BarraInferior
+import com.levelia.levelia.presentation.screens.components.TabInferior
 import com.levelia.levelia.ui.theme.MoradoAcento
 import com.levelia.levelia.ui.theme.TextoSecundario
 
 @Composable
-fun HomeScreen(user: UserData?, onLogout: () -> Unit) {
-    AuthColumn(title = "¡Hola${user?.nombre?.let { ", $it" }.orEmpty()}!") {
-        if (user != null) {
-            TarjetaUsuario(user)
+fun HomeScreen(user: UserData?, onLogout: () -> Unit, onTab: (TabInferior) -> Unit) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        AuthColumn(title = "¡Hola${user?.nombre?.let { ", $it" }.orEmpty()}!") {
+            if (user != null) {
+                TarjetaUsuario(user)
+            }
+            OutlinedButton(
+                onClick = onLogout,
+                shape = RoundedCornerShape(12.dp),
+                border = BorderStroke(1.dp, MoradoAcento),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = MoradoAcento),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = null, modifier = Modifier.size(18.dp))
+                Text("Cerrar sesión", modifier = Modifier.padding(start = 8.dp))
+            }
+            // Espacio para que la barra inferior no tape el botón
+            Spacer(Modifier.height(ALTO_BARRA_INFERIOR))
         }
-        OutlinedButton(
-            onClick = onLogout,
-            shape = RoundedCornerShape(12.dp),
-            border = BorderStroke(1.dp, MoradoAcento),
-            colors = ButtonDefaults.outlinedButtonColors(contentColor = MoradoAcento),
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = null, modifier = Modifier.size(18.dp))
-            Text("Cerrar sesión", modifier = Modifier.padding(start = 8.dp))
-        }
+        BarraInferior(
+            seleccion = TabInferior.INICIO,
+            onTab = onTab,
+            modifier = Modifier.align(Alignment.BottomCenter),
+        )
     }
 }
 

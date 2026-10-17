@@ -16,7 +16,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -29,7 +28,6 @@ import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.res.imageResource
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.levelia.levelia.R
 import com.levelia.levelia.domain.models.Avatar
@@ -48,9 +46,12 @@ fun Avatar.color(): Color = when (this) {
     Avatar.AVATAR_4 -> Color(0xFFF2B21E)
     Avatar.AVATAR_5 -> Color(0xFF1FD3E0)
     Avatar.AVATAR_6 -> Color(0xFFEC4F9B)
+    Avatar.AVATAR_7 -> Color(0xFF6C94C4)
+    Avatar.AVATAR_8 -> Color(0xFFA070F8)
+    Avatar.AVATAR_9 -> Color(0xFF2F8FE8)
 }
 
-/** PNG de cada personaje (recortado de Characters.png) en res/drawable-nodpi. */
+/** PNG de cada personaje (recortado de Characters.png / recursos2.png) en res/drawable-nodpi. */
 @DrawableRes
 fun Avatar.recurso(): Int = when (this) {
     Avatar.AVATAR_1 -> R.drawable.avatar_1
@@ -59,6 +60,9 @@ fun Avatar.recurso(): Int = when (this) {
     Avatar.AVATAR_4 -> R.drawable.avatar_4
     Avatar.AVATAR_5 -> R.drawable.avatar_5
     Avatar.AVATAR_6 -> R.drawable.avatar_6
+    Avatar.AVATAR_7 -> R.drawable.avatar_7
+    Avatar.AVATAR_8 -> R.drawable.avatar_8
+    Avatar.AVATAR_9 -> R.drawable.avatar_9
 }
 
 fun Avatar.etiqueta(): String = "Avatar ${ordinal + 1}"
@@ -90,7 +94,7 @@ fun RegisterStep3Screen(
             modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            // 6 personajes en 2 filas de 3
+            // 9 personajes en 3 filas de 3
             Avatar.entries.chunked(3).forEach { fila ->
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
                     fila.forEach { avatar ->
@@ -135,7 +139,7 @@ private fun AvatarOpcion(avatar: Avatar, seleccionado: Boolean, habilitado: Bool
         Box(contentAlignment = Alignment.BottomEnd) {
             AvatarImagen(
                 avatar = avatar,
-                // Tamaño fijo: si el seleccionado creciera, su etiqueta quedaría más abajo que las otras
+                // Tamaño fijo: si el seleccionado creciera, desalinearía la fila
                 modifier = Modifier
                     .size(84.dp)
                     .alpha(if (seleccionado) 1f else 0.7f)
@@ -154,11 +158,6 @@ private fun AvatarOpcion(avatar: Avatar, seleccionado: Boolean, habilitado: Bool
                 }
             }
         }
-        Text(
-            avatar.etiqueta(),
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = if (seleccionado) FontWeight.Bold else FontWeight.Normal,
-            color = if (seleccionado) color else TextoSecundario,
-        )
+        // Solo la imagen: el nombre "Avatar N" queda como descripción para lectores de pantalla
     }
 }

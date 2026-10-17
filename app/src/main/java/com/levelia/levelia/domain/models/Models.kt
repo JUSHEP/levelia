@@ -65,8 +65,29 @@ sealed class Destinations(val route: String) {
     data object RegisterStep3Screen : Destinations("register_step3")
     data object RegisterStep4Screen : Destinations("register_step4")
     data object RecoverPasswordScreen : Destinations("recover_password")
-    data object CheckEmailScreen : Destinations("check_email")
+    data object RecoverCodeScreen : Destinations("recover_code")
+    data object RestablecerContrasenaScreen : Destinations("restablecer_contrasena")
     data object HomeScreen : Destinations("home")
+    data object PerfilScreen : Destinations("perfil")
+    data object EditarNombreScreen : Destinations("perfil_editar_nombre")
+    data object CambiarAvatarScreen : Destinations("perfil_cambiar_avatar")
+    data object CambiarContrasenaScreen : Destinations("perfil_cambiar_contrasena")
+    data object CuentaEliminadaScreen : Destinations("cuenta_eliminada")
 }
 
-enum class Avatar { AVATAR_1, AVATAR_2, AVATAR_3, AVATAR_4, AVATAR_5, AVATAR_6 }
+/**
+ * Los nombres se guardan tal cual en la columna `perfiles.avatar` (y en su CHECK de Supabase):
+ * no renombrar ni reordenar. 1-6 son los del registro original; 7-9 se añadieron con el módulo Perfil.
+ */
+enum class Avatar {
+    AVATAR_1, AVATAR_2, AVATAR_3, AVATAR_4, AVATAR_5, AVATAR_6, AVATAR_7, AVATAR_8, AVATAR_9;
+
+    companion object {
+        /** Orden de la cuadrícula "Cambiar avatar" del diseño (3 por fila). */
+        val ordenSeleccion: List<Avatar> = listOf(
+            AVATAR_7, AVATAR_8, AVATAR_9,
+            AVATAR_1, AVATAR_2, AVATAR_4,
+            AVATAR_3, AVATAR_5, AVATAR_6,
+        )
+    }
+}

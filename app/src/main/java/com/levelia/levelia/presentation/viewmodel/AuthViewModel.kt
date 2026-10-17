@@ -1,16 +1,18 @@
 package com.levelia.levelia.presentation.viewmodel
 
-import android.util.Patterns
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.levelia.levelia.BuildConfig
 import com.levelia.levelia.data.repository.AuthRepository
+import com.levelia.levelia.domain.ReglasPerfil
 import com.levelia.levelia.domain.models.AuthResult
 import com.levelia.levelia.domain.models.Avatar
 import com.levelia.levelia.domain.models.DialogoAuth
+import com.levelia.levelia.domain.models.DialogoPerfil
 import com.levelia.levelia.domain.models.ErroresLogin
 import com.levelia.levelia.domain.models.ErroresPaso1
+import com.levelia.levelia.domain.models.RecuperarState
 import com.levelia.levelia.domain.models.RegisterState
+import com.levelia.levelia.domain.models.TipoDialogoPerfil
 import com.levelia.levelia.domain.models.UserData
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
@@ -36,12 +38,16 @@ class AuthViewModel @Inject constructor(
     private val _user = MutableStateFlow<UserData?>(null)
     val user: StateFlow<UserData?> = _user.asStateFlow()
 
+    /** true mientras se revisa si quedó una sesión guardada (el NavGraph espera para elegir la pantalla de inicio). */
+    private val _restaurandoSesion = MutableStateFlow(true)
+    val restaurandoSesion: StateFlow<Boolean> = _restaurandoSesion.asStateFlow()
+
     // --- Registro ---
 
     private val _registerState = MutableStateFlow(RegisterState())
     val registerState: StateFlow<RegisterState> = _registerState.asStateFlow()
 
-    /** Solo en builds debug: no hay envío real de emails, así que se muestra el código en pantalla. */
+    /** Ya no se usa (el código llega por correo desde Supabase); la pantalla del paso 2 todavía lo recibe. */
     private val _codigoDePrueba = MutableStateFlow<String?>(null)
     val codigoDePrueba: StateFlow<String?> = _codigoDePrueba.asStateFlow()
 
@@ -82,10 +88,15 @@ class AuthViewModel @Inject constructor(
     private val _recuperarLoading = MutableStateFlow(false)
     val recuperarLoading: StateFlow<Boolean> = _recuperarLoading.asStateFlow()
 
+    /** Código y contraseña nueva, después de enviar el correo de recuperación. */
+    private val _recuperacion = MutableStateFlow(RecuperarState())
+    val recuperacion: StateFlow<RecuperarState> = _recuperacion.asStateFlow()
+
     private var cuentaRegresivaJob: Job? = null
+    private var cuentaRegresivaRecuperacionJob: Job? = null
 
     init {
-        checkCurrentSession()
+        restaurarSesion()
         loadRememberedEmail()
     }
 
@@ -107,22 +118,8 @@ class AuthViewModel @Inject constructor(
     fun cerrarDialogo() = actualizar { copy(dialogo = null) }
 
     fun onCodigoDigitChanged(posicion: Int, digito: String) {
-        if (posicion !in 0 until LONGITUD_CODIGO) return
-        val soloDigitos = digito.filter(Char::isDigit)
-
-        // Pegar el código completo en cualquier casilla lo reparte entre las 6
-        if (soloDigitos.length == LONGITUD_CODIGO) {
-            actualizar { copy(codigoVerificacion = soloDigitos, error = null) }
-            return
-        }
-
-        val casillas = _registerState.value.codigoVerificacion
-            .padEnd(LONGITUD_CODIGO, ' ')
-            .toCharArray()
-        // Al escribir sobre una casilla llena llegan 2 caracteres: se queda el nuevo (el último).
-        // digito = "" (borrado) deja la casilla vacía.
-        casillas[posicion] = soloDigitos.lastOrNull() ?: ' '
-        actualizar { copy(codigoVerificacion = String(casillas).trimEnd(), error = null) }
+        val codigo = codigoConDigito(_registerState.value.codigoVerificacion, posicion, digito) ?: return
+        actualizar { copy(codigoVerificacion = codigo, error = null) }
     }
 
     fun onAvatarSelected(avatar: String) {
@@ -140,6 +137,25 @@ class AuthViewModel @Inject constructor(
         }
 
         ejecutarRegistro {
+            // El nombre de usuario es único: se revisa antes de crear la cuenta
+            when (val d = authRepository.nombreDisponible(estado.nombre.trim())) {
+                is AuthResult.Success -> if (!d.data) {
+                    actualizar { copy(errores = errores.copy(nombre = NOMBRE_NO_DISPONIBLE)) }
+                    return@ejecutarRegistro
+                }
+                is AuthResult.Error -> {
+                    actualizar { copy(error = d.message, dialogo = DialogoAuth.ERROR_SERVIDOR) }
+                    return@ejecutarRegistro
+                }
+                is AuthResult.Loading -> Unit
+            }
+
+            // Volvió al paso 1 con el correo ya verificado en este registro: solo se corrige el perfil
+            if (estado.emailVerificado) {
+                guardarPerfilYSeguir()
+                return@ejecutarRegistro
+            }
+
             when (val r = authRepository.signUp(estado.email, estado.contraseña)) {
                 is AuthResult.Success -> {
                     actualizar {
@@ -150,15 +166,28 @@ class AuthViewModel @Inject constructor(
                             emailVerificado = false,
                         )
                     }
-                    actualizarCodigoDePrueba(estado.email)
                     iniciarCuentaRegresiva()
                 }
-                is AuthResult.Error -> actualizar {
-                    if (r.message.startsWith("Ya existe")) {
-                        // El correo ya está registrado: se marca el campo, sin diálogo
-                        copy(errores = errores.copy(email = r.message))
-                    } else {
-                        copy(error = r.message, dialogo = DialogoAuth.ERROR_SERVIDOR)
+                is AuthResult.Error -> {
+                    if (!r.message.startsWith("Ya existe")) {
+                        actualizar { copy(error = r.message, dialogo = DialogoAuth.ERROR_SERVIDOR) }
+                        return@ejecutarRegistro
+                    }
+                    // Correo ya registrado: si quedó confirmado sin perfil (registro a medias) se retoma
+                    when (val retomar = authRepository.retomarRegistro(estado.email, estado.contraseña)) {
+                        is AuthResult.Success -> {
+                            actualizar { copy(emailVerificado = true) }
+                            guardarPerfilYSeguir()
+                        }
+                        // Cuenta completa (o contraseña distinta): se marca el campo, sin diálogo
+                        is AuthResult.Error -> actualizar {
+                            if (retomar.message.startsWith("Ya existe")) {
+                                copy(errores = errores.copy(email = retomar.message))
+                            } else {
+                                copy(error = retomar.message, dialogo = DialogoAuth.ERROR_SERVIDOR)
+                            }
+                        }
+                        is AuthResult.Loading -> Unit
                     }
                 }
                 is AuthResult.Loading -> Unit
@@ -175,7 +204,9 @@ class AuthViewModel @Inject constructor(
                 is AuthResult.Success -> {
                     cuentaRegresivaJob?.cancel()
                     _codigoDePrueba.value = null
-                    actualizar { copy(pasoActual = 3, emailVerificado = true, tiempoReenvio = 0) }
+                    actualizar { copy(emailVerificado = true, tiempoReenvio = 0) }
+                    // El código confirma la cuenta: el perfil se guarda ya, no al terminar el paso 3
+                    guardarPerfilYSeguir()
                 }
                 is AuthResult.Error -> {
                     val intentos = estado.intentosFallidos + 1
@@ -215,7 +246,6 @@ class AuthViewModel @Inject constructor(
             when (val r = authRepository.resendCode(estado.email)) {
                 is AuthResult.Success -> {
                     actualizar { copy(intentosFallidos = 0, codigoVerificacion = "") }
-                    actualizarCodigoDePrueba(estado.email)
                     iniciarCuentaRegresiva()
                 }
                 is AuthResult.Error -> actualizar { copy(error = r.message) }
@@ -244,6 +274,40 @@ class AuthViewModel @Inject constructor(
                 is AuthResult.Loading -> Unit
             }
         }
+    }
+
+    /**
+     * Crea (o corrige) el perfil con los datos del paso 1 y pasa a elegir avatar. Mientras no se elija,
+     * queda el primer avatar. Si falla, el paso 2 muestra "Email verificado" y el botón Continuar.
+     */
+    private suspend fun guardarPerfilYSeguir() {
+        val estado = _registerState.value
+        val r = authRepository.createUserProfile(
+            email = estado.email,
+            nombre = estado.nombre.trim(),
+            edad = estado.edad,
+            avatar = estado.avatarSeleccionado.ifEmpty { Avatar.entries.first().name },
+        )
+        when (r) {
+            is AuthResult.Success -> {
+                _user.value = r.data
+                actualizar { copy(pasoActual = 3, error = null, dialogo = null) }
+            }
+            is AuthResult.Error -> actualizar {
+                if (r.message.startsWith("Ese nombre")) {
+                    // Alguien tomó el nombre mientras tanto: se corrige en el paso 1
+                    copy(pasoActual = 1, errores = errores.copy(nombre = NOMBRE_NO_DISPONIBLE))
+                } else {
+                    copy(error = r.message)
+                }
+            }
+            is AuthResult.Loading -> Unit
+        }
+    }
+
+    /** El perfil cambió en la pantalla Perfil (nombre o avatar): se refleja en el resto de la app. */
+    fun actualizarUsuario(usuario: UserData) {
+        _user.value = usuario
     }
 
     /** Botón "Empezar" del paso 4: con isAuthenticated = true el NavGraph lleva a Home. */
@@ -309,7 +373,7 @@ class AuthViewModel @Inject constructor(
         val erroresCampos = ErroresLogin(
             email = when {
                 email.isEmpty() -> OBLIGATORIO
-                !Patterns.EMAIL_ADDRESS.matcher(email).matches() -> "Correo incorrecto."
+                !ReglasPerfil.correoValido(email) -> "Correo incorrecto."
                 else -> null
             },
             contraseña = if (password.isEmpty()) OBLIGATORIO else null,
@@ -336,11 +400,14 @@ class AuthViewModel @Inject constructor(
                         _loginPasswordVisible.value = false
                         _isAuthenticated.value = true
                     }
-                    // El repositorio solo falla en el login por credenciales: se marcan ambos campos
-                    is AuthResult.Error -> _erroresLogin.value = ErroresLogin(
-                        email = "Correo incorrecto.",
-                        contraseña = "Contraseña incorrecta.",
-                    )
+                    // Credenciales malas: se marcan ambos campos. Otros fallos (sin internet, servidor,
+                    // correo sin verificar) se muestran como mensaje bajo el correo.
+                    is AuthResult.Error -> _erroresLogin.value =
+                        if (r.message.startsWith("Email o contraseña")) {
+                            ErroresLogin(email = "Correo incorrecto.", contraseña = "Contraseña incorrecta.")
+                        } else {
+                            ErroresLogin(email = r.message)
+                        }
                     is AuthResult.Loading -> Unit
                 }
             } finally {
@@ -350,7 +417,7 @@ class AuthViewModel @Inject constructor(
     }
 
     fun logout() {
-        authRepository.logout()
+        viewModelScope.launch { authRepository.logout() }
         _user.value = null
         _isAuthenticated.value = false
         _loginPassword.value = ""
@@ -361,11 +428,21 @@ class AuthViewModel @Inject constructor(
         loadRememberedEmail()
     }
 
-    fun checkCurrentSession() {
-        val r = authRepository.getCurrentUser()
-        if (r is AuthResult.Success && r.data != null) {
-            _user.value = r.data
-            _isAuthenticated.value = true
+    /** Si Supabase guardó una sesión, entra directo a Home con el perfil leído de la base de datos. */
+    private fun restaurarSesion() {
+        viewModelScope.launch {
+            try {
+                val r = authRepository.restaurarSesion()
+                if (r is AuthResult.Success) {
+                    val usuario = r.data
+                    if (usuario != null) {
+                        _user.value = usuario
+                        _isAuthenticated.value = true
+                    }
+                }
+            } finally {
+                _restaurandoSesion.value = false
+            }
         }
     }
 
@@ -380,6 +457,8 @@ class AuthViewModel @Inject constructor(
         _recuperarEmail.value = _loginEmail.value
         _recuperarError.value = null
         _recuperarLoading.value = false
+        cuentaRegresivaRecuperacionJob?.cancel()
+        _recuperacion.value = RecuperarState()
     }
 
     fun onRecuperarEmailChanged(email: String) {
@@ -393,7 +472,7 @@ class AuthViewModel @Inject constructor(
         val email = _recuperarEmail.value
         _recuperarError.value = when {
             email.isEmpty() -> OBLIGATORIO
-            !Patterns.EMAIL_ADDRESS.matcher(email).matches() -> "Correo incorrecto."
+            !ReglasPerfil.correoValido(email) -> "Correo incorrecto."
             else -> null
         }
         if (_recuperarError.value != null) return
@@ -402,17 +481,127 @@ class AuthViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 when (val r = authRepository.solicitarRecuperacion(email)) {
-                    is AuthResult.Success -> onEnviado()
+                    is AuthResult.Success -> {
+                        _recuperacion.value = RecuperarState()
+                        iniciarCuentaRegresivaRecuperacion()
+                        onEnviado()
+                    }
                     is AuthResult.Error -> _recuperarError.value = r.message
                     is AuthResult.Loading -> Unit
                 }
             } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
                 Timber.e(e, "Error al solicitar la recuperación")
                 _recuperarError.value = "No pudimos enviar el correo. Inténtalo más tarde."
             } finally {
                 _recuperarLoading.value = false
             }
         }
+    }
+
+    fun onRecuperarCodigoChanged(posicion: Int, digito: String) {
+        val codigo = codigoConDigito(_recuperacion.value.codigo, posicion, digito) ?: return
+        _recuperacion.update { it.copy(codigo = codigo, error = null) }
+    }
+
+    /** Igual que el paso 2 del registro: 3 intentos y luego hay que pedir otro código. */
+    fun verificarCodigoRecuperacion(onVerificado: () -> Unit) {
+        val estado = _recuperacion.value
+        if (estado.cargando || !codigoCompleto(estado.codigo) || estado.intentosFallidos >= MAX_INTENTOS) return
+
+        ejecutarRecuperacion {
+            when (val r = authRepository.verificarCodigoRecuperacion(_recuperarEmail.value, estado.codigo)) {
+                is AuthResult.Success -> {
+                    cuentaRegresivaRecuperacionJob?.cancel()
+                    _recuperacion.update { it.copy(codigoVerificado = true, tiempoReenvio = 0) }
+                    onVerificado()
+                }
+                is AuthResult.Error -> {
+                    val intentos = estado.intentosFallidos + 1
+                    val restantes = MAX_INTENTOS - intentos
+                    if (intentos >= MAX_INTENTOS) cuentaRegresivaRecuperacionJob?.cancel()
+                    _recuperacion.update {
+                        it.copy(
+                            intentosFallidos = intentos,
+                            codigo = "",
+                            tiempoReenvio = if (intentos >= MAX_INTENTOS) 0 else it.tiempoReenvio,
+                            error = if (intentos >= MAX_INTENTOS) {
+                                "Demasiados intentos. Solicita un nuevo código."
+                            } else {
+                                "${r.message} Te queda${if (restantes == 1) "" else "n"} $restantes " +
+                                    "intento${if (restantes == 1) "" else "s"}."
+                            },
+                        )
+                    }
+                }
+                is AuthResult.Loading -> Unit
+            }
+        }
+    }
+
+    /** Vuelve a pedir el correo "Reset password" (Supabase manda un código nuevo). */
+    fun reenviarCodigoRecuperacion() {
+        val estado = _recuperacion.value
+        if (estado.cargando || estado.tiempoReenvio > 0) return
+
+        ejecutarRecuperacion {
+            when (val r = authRepository.solicitarRecuperacion(_recuperarEmail.value)) {
+                is AuthResult.Success -> {
+                    _recuperacion.update { it.copy(intentosFallidos = 0, codigo = "") }
+                    iniciarCuentaRegresivaRecuperacion()
+                }
+                is AuthResult.Error -> _recuperacion.update { it.copy(error = r.message) }
+                is AuthResult.Loading -> Unit
+            }
+        }
+    }
+
+    fun onRecuperarNuevaChanged(texto: String) = _recuperacion.update { it.copy(nueva = texto) }
+    fun onRecuperarConfirmarChanged(texto: String) = _recuperacion.update { it.copy(confirmar = texto) }
+
+    /** Mismas reglas y diálogos que "Cambiar contraseña" del Perfil, sin pedir la contraseña actual. */
+    fun restablecerContrasena() {
+        val estado = _recuperacion.value
+        if (estado.cargando || !estado.codigoVerificado) return
+
+        // El diálogo dice exactamente qué falta
+        val motivo = ReglasPerfil.motivoContrasenaInvalida(estado.nueva, estado.confirmar)
+        if (motivo != null) {
+            _recuperacion.update { it.copy(dialogo = DialogoPerfil(TipoDialogoPerfil.CONTRASENA_INVALIDA, motivo)) }
+            return
+        }
+
+        ejecutarRecuperacion {
+            when (val r = authRepository.restablecerContrasena(estado.nueva)) {
+                // El repositorio ya cerró la sesión temporal: se entra con la contraseña nueva desde el login
+                is AuthResult.Success -> _recuperacion.update {
+                    RecuperarState(
+                        dialogo = DialogoPerfil(
+                            TipoDialogoPerfil.CONTRASENA_ACTUALIZADA,
+                            PerfilViewModel.MENSAJE_CONTRASENA_ACTUALIZADA,
+                        ),
+                    )
+                }
+                is AuthResult.Error -> _recuperacion.update {
+                    val tipo = if (r.message.startsWith("La contraseña") || r.message.startsWith("La nueva contraseña")) {
+                        TipoDialogoPerfil.CONTRASENA_INVALIDA
+                    } else {
+                        TipoDialogoPerfil.ERROR_SERVIDOR
+                    }
+                    it.copy(dialogo = DialogoPerfil(tipo, r.message))
+                }
+                is AuthResult.Loading -> Unit
+            }
+        }
+    }
+
+    fun cerrarDialogoRecuperacion() = _recuperacion.update { it.copy(dialogo = null) }
+
+    /** Salir de "Restablecer contraseña" sin guardar: se cierra la sesión temporal del código. */
+    fun cancelarRecuperacion() {
+        if (_recuperacion.value.codigoVerificado) viewModelScope.launch { authRepository.logout() }
+        cuentaRegresivaRecuperacionJob?.cancel()
+        _recuperacion.value = RecuperarState()
     }
 
     fun limpiarError() {
@@ -426,7 +615,7 @@ class AuthViewModel @Inject constructor(
     private fun validarPaso1(estado: RegisterState): ErroresPaso1 = ErroresPaso1(
         nombre = when {
             estado.nombre.isBlank() -> OBLIGATORIO
-            estado.nombre.trim().length < NOMBRE_MINIMO -> "Prueba con otro nombre."
+            !ReglasPerfil.nombreValido(estado.nombre.trim()) -> NOMBRE_NO_DISPONIBLE
             else -> null
         },
         edad = when {
@@ -436,12 +625,13 @@ class AuthViewModel @Inject constructor(
         },
         email = when {
             estado.email.isEmpty() -> OBLIGATORIO
-            !Patterns.EMAIL_ADDRESS.matcher(estado.email).matches() -> "Correo incorrecto."
+            !ReglasPerfil.correoValido(estado.email) -> "Correo incorrecto."
             else -> null
         },
         contraseña = when {
             estado.contraseña.isEmpty() -> OBLIGATORIO
-            estado.contraseña.length < CONTRASENA_MINIMA -> "Contraseña incorrecta."
+            // Las mismas 4 reglas que "Cambiar contraseña" y que exige Supabase Auth
+            !ReglasPerfil.requisitosContrasena(estado.contraseña).cumpleTodos -> "Contraseña incorrecta."
             else -> null
         },
     )
@@ -455,11 +645,23 @@ class AuthViewModel @Inject constructor(
         else -> null
     }
 
-    private fun codigoCompleto(estado: RegisterState) =
-        estado.codigoVerificacion.length == LONGITUD_CODIGO && estado.codigoVerificacion.all(Char::isDigit)
+    private fun codigoCompleto(estado: RegisterState) = codigoCompleto(estado.codigoVerificacion)
 
-    private fun actualizarCodigoDePrueba(email: String) {
-        if (BuildConfig.DEBUG) _codigoDePrueba.value = authRepository.debugPendingCode(email)
+    private fun codigoCompleto(codigo: String) = codigo.length == LONGITUD_CODIGO && codigo.all(Char::isDigit)
+
+    /** El código después de escribir [digito] en la casilla [posicion] (null = posición inválida). */
+    private fun codigoConDigito(actual: String, posicion: Int, digito: String): String? {
+        if (posicion !in 0 until LONGITUD_CODIGO) return null
+        val soloDigitos = digito.filter(Char::isDigit)
+
+        // Pegar el código completo en cualquier casilla lo reparte entre las 6
+        if (soloDigitos.length == LONGITUD_CODIGO) return soloDigitos
+
+        val casillas = actual.padEnd(LONGITUD_CODIGO, ' ').toCharArray()
+        // Al escribir sobre una casilla llena llegan 2 caracteres: se queda el nuevo (el último).
+        // digito = "" (borrado) deja la casilla vacía.
+        casillas[posicion] = soloDigitos.lastOrNull() ?: ' '
+        return String(casillas).trimEnd()
     }
 
     private fun iniciarCuentaRegresiva() {
@@ -468,6 +670,33 @@ class AuthViewModel @Inject constructor(
             for (segundos in COOLDOWN_REENVIO_SEGUNDOS downTo 0) {
                 actualizar { copy(tiempoReenvio = segundos) }
                 if (segundos > 0) delay(1_000)
+            }
+        }
+    }
+
+    private fun iniciarCuentaRegresivaRecuperacion() {
+        cuentaRegresivaRecuperacionJob?.cancel()
+        cuentaRegresivaRecuperacionJob = viewModelScope.launch {
+            for (segundos in COOLDOWN_REENVIO_SEGUNDOS downTo 0) {
+                _recuperacion.update { it.copy(tiempoReenvio = segundos) }
+                if (segundos > 0) delay(1_000)
+            }
+        }
+    }
+
+    private fun ejecutarRecuperacion(bloque: suspend () -> Unit) {
+        _recuperacion.update { it.copy(cargando = true, error = null, dialogo = null) }
+        viewModelScope.launch {
+            try {
+                bloque()
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                Timber.e(e, "Error al recuperar la contraseña")
+                _recuperacion.update {
+                    it.copy(dialogo = DialogoPerfil(TipoDialogoPerfil.ERROR_SERVIDOR, "Ocurrió un error inesperado. Inténtalo de nuevo."))
+                }
+            } finally {
+                _recuperacion.update { it.copy(cargando = false) }
             }
         }
     }
@@ -497,10 +726,9 @@ class AuthViewModel @Inject constructor(
         const val LONGITUD_CODIGO = 6
         const val MAX_INTENTOS = 3
         const val COOLDOWN_REENVIO_SEGUNDOS = 60
-        const val NOMBRE_MINIMO = 3
         const val EDAD_MINIMA = 13
         const val EDAD_MAXIMA = 120
-        const val CONTRASENA_MINIMA = 8
         const val OBLIGATORIO = "Este campo es obligatorio."
+        const val NOMBRE_NO_DISPONIBLE = "Prueba con otro nombre."
     }
 }

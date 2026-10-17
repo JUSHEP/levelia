@@ -62,3 +62,27 @@ val DialogoDegradadoParadas: Array<Pair<Float, Color>> = arrayOf(
 )
 val BotonDialogoInicio = Color(0xFF0E6B55)
 val BotonDialogoFin = Color(0xFF1C8A70)
+
+// ---------------------------------------------------------------------------------------------
+// Módulo Perfil (valores medidos de las capturas de Figma)
+// ---------------------------------------------------------------------------------------------
+
+val BotonCancelar = Color(0xFF320260) // "Cancelar" (pantallas y diálogos)
+val BotonGuardar = Color(0xFF008A6A) // "Guardar", "Aceptar", "Volver al inicio"
+val BotonPeligro = Color(0xFFFB3845) // "Eliminar cuenta" del diálogo de confirmación
+
+val PerfilTarjetaFondo = Color(0xFF1D0249) // opciones del menú de perfil y barra inferior
+val PerfilTarjetaBorde = Color(0xFF1D2F54)
+val PerfilPanelFondo = Color(0xFF15033E) // tarjeta "Tu progreso" y campos de texto
+val PerfilPanelBorde = Color(0xFF4C207D)
+val PerfilCampoContrasena = Color(0xFF000434) // interior más oscuro de los campos de contraseña
+val PerfilSubtitulo = Color(0xFF6F5C8E) // "Cambia tu nombre en la app"
+
+val XpPistaFondo = Color(0xFF1C0859)
+val XpPistaBorde = Color(0xFF6F4AE2)
+val XpRellenoArriba = Color(0xFF2ED48A)
+val XpRellenoMedio = Color(0xFF02B266)
+val XpRellenoAbajo = Color(0xFF02975E)
+
+val RequisitoCumplido = Color(0xFF038456)
+val RequisitoFallido = Color(0xFFCB195D)
