@@ -33,11 +33,11 @@ class PerfilDtosTest {
     }
 
     @Test
-    fun `fila de progreso real sin xp_siguiente_nivel usa 1000`() {
+    fun `fila de progreso real calcula la meta del nivel con la curva`() {
         val fila = """{"user_id":"u1","nivel":2,"xp":650,"updated_at":"2026-10-15T17:40:00+00:00"}"""
         val progreso = json.decodeFromString<ProgresoDto>(fila).aProgresoData()
         assertEquals(2, progreso.nivel)
         assertEquals(650, progreso.xp)
-        assertEquals(1000, progreso.xpSiguienteNivel)
+        assertEquals(283, progreso.xpSiguienteNivel) // nivel 2 → round(100 · 2^1.5)
     }
 }

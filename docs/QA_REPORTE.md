@@ -54,3 +54,26 @@ $env:JAVA_HOME = "C:\Program Files\Java\jdk-21.0.12.1"
 ```
 
 Reporte HTML: `app/build/reports/tests/testDebugUnitTest/index.html`.
+
+## Módulo Misiones — revisión QA de backend (2026-10-21)
+
+Qué se prueba: `supabase/pruebas_misiones.sql` (termina con `PRUEBAS_OK`, corrido contra el proyecto real sin dejar datos), `data/MisionesDatosTest` (5), `presentation/MisionesViewModelTest` (17). Total de la app: **105 pruebas, 0 fallos**.
+
+| # | Severidad | Hallazgo | Corrección |
+|---|---|---|---|
+| M1 | **Alta** | XP infinita: cumplir, reclamar y volver a aceptar la misma misión el mismo día (y la UNICA las veces que se quisiera) | `aceptar_mision()`: la UNICA una sola vez; las demás solo cuando terminó el plazo de la anterior (`MISION_EN_CURSO`, `MISION_YA_HECHA`); misma regla en `MisionConProgreso.sePuedeAceptar(hoy)` |
+| M2 | Media | Volver a aceptar con la XP sin reclamar escondía el botón "¡Reclamar recompensa!" | Hay que reclamar antes (`RECOMPENSA_PENDIENTE`) |
+| M3 | Media | Aceptar dos veces a la vez (doble toque / dos teléfonos) daba "error del servidor" | El índice único se traduce a "Ya aceptaste esta misión." |
+| M4 | Media | El ViewModel compartido no se limpiaba al cerrar sesión (el siguiente usuario vería misiones del anterior) | `MisionesViewModel.limpiar()`, igual que `PerfilViewModel.limpiar()` |
+| M5 | Media | Registrar progreso con el plazo vencido se trataba como éxito | Aviso "Se venció el plazo de esta misión." (y no vuelve a la lista) |
+| M6 | Baja | Dos lecturas seguidas podían pisar datos nuevos con viejos | `cargaJob` cancela la lectura anterior |
+| M7 | Baja | Tras aceptar, el detalle no tenía la misión aceptada hasta recargar | La respuesta del servidor se refleja en la lista de inmediato |
+| M8 | Baja | Nombre > 40 caracteres solo lo detectaba el servidor | Se marca bajo el campo |
+| M9 | Baja | Editar las predefinidas en el SQL y volver a correrlo no las actualizaba | `on conflict … do update` |
+| M10 | Prueba | `select (f()).*` en las pruebas SQL ejecutaba la función una vez por columna | Se usa `select * from f()` (la app ya llama así vía Supabase) |
+
+Pendientes (requieren reingeniería o decisión, no se corrigen aquí):
+- La lista lee todo el historial de `misiones_usuario` en cada carga: con meses de uso convendría una vista/RPC con solo la última aceptación por misión.
+- `hoy()` usa la hora de Colombia fija y no se puede simular otro día en las pruebas SQL (el "mañana sí puede registrar" se prueba en Kotlin).
+- Las predefinidas del diseño (A clases 2/100, Modo enfoque 2/75, Sígueme 3/100) no coinciden con la tabla de dificultades (1/75, 3/150, 5/300): confirmar con el equipo.
+- Lint: el único error es `local.properties` (archivo local de Android Studio, no va en git); los avisos `UseKtx` de `AuthRepository` son anteriores.

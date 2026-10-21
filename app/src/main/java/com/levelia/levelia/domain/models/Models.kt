@@ -73,6 +73,7 @@ sealed class Destinations(val route: String) {
     data object CambiarAvatarScreen : Destinations("perfil_cambiar_avatar")
     data object CambiarContrasenaScreen : Destinations("perfil_cambiar_contrasena")
     data object CuentaEliminadaScreen : Destinations("cuenta_eliminada")
+    data object MisionesScreen : Destinations("misiones")
 }
 
 /**

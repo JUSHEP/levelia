@@ -24,7 +24,6 @@ import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import timber.log.Timber
-import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -393,9 +392,7 @@ class AuthRepository @Inject constructor(
         val causas = generateSequence(e) { it.cause }.toList()
         val texto = causas.joinToString(" ") { it.message.orEmpty() }.lowercase()
         return when {
-            causas.any { it is IOException || it::class.simpleName.orEmpty().contains("HttpRequest") } ||
-                "unable to resolve host" in texto || "timed out" in texto || "timeout" in texto ->
-                "No hay conexión a internet. Inténtalo de nuevo."
+            esSinConexion(e) -> SIN_CONEXION
             "invalid login credentials" in texto -> CREDENCIALES_INCORRECTAS
             "email not confirmed" in texto -> "Debes verificar tu correo antes de iniciar sesión."
             "already registered" in texto -> CUENTA_EXISTENTE
@@ -440,6 +437,5 @@ class AuthRepository @Inject constructor(
         const val CUENTA_EXISTENTE = "Ya existe una cuenta con ese email. Inicia sesión."
         const val REGISTRO_INCOMPLETO =
             "Tu registro no se terminó. Regístrate de nuevo con este correo y la misma contraseña."
-        const val ERROR_SERVIDOR = "Algo salió mal con nuestros servidores. Inténtalo más tarde."
     }
 }

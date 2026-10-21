@@ -25,6 +25,7 @@ import com.levelia.levelia.presentation.screens.CuentaEliminadaScreen
 import com.levelia.levelia.presentation.screens.EditarNombreScreen
 import com.levelia.levelia.presentation.screens.HomeScreen
 import com.levelia.levelia.presentation.screens.LoginScreen
+import com.levelia.levelia.presentation.screens.MisionesScreen
 import com.levelia.levelia.presentation.screens.PerfilScreen
 import com.levelia.levelia.presentation.screens.RecoverPasswordScreen
 import com.levelia.levelia.presentation.screens.RestablecerContrasenaScreen
@@ -35,6 +36,7 @@ import com.levelia.levelia.presentation.screens.RegisterStep4Screen
 import com.levelia.levelia.presentation.screens.components.LeveliaBackground
 import com.levelia.levelia.presentation.screens.components.TabInferior
 import com.levelia.levelia.presentation.viewmodel.AuthViewModel
+import com.levelia.levelia.presentation.viewmodel.MisionesViewModel
 import com.levelia.levelia.presentation.viewmodel.PerfilViewModel
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
@@ -56,16 +58,18 @@ private val RUTAS_PROTEGIDAS = listOf(
     Destinations.EditarNombreScreen.route,
     Destinations.CambiarAvatarScreen.route,
     Destinations.CambiarContrasenaScreen.route,
+    Destinations.MisionesScreen.route,
 )
 
 /**
- * [authViewModel] y [perfilViewModel] deben crearse fuera del NavHost (ver MainActivity): si cada
+ * [authViewModel], [perfilViewModel] y [misionesViewModel] deben crearse fuera del NavHost (ver MainActivity): si cada
  * destino llamara a hiltViewModel() tendría su propia instancia y el estado se perdería entre pantallas.
  */
 @Composable
 fun NavGraph(
     authViewModel: AuthViewModel,
     perfilViewModel: PerfilViewModel,
+    misionesViewModel: MisionesViewModel,
     modifier: Modifier = Modifier,
     navController: NavHostController = rememberNavController(),
 ) {
@@ -74,7 +78,7 @@ fun NavGraph(
     if (restaurando) {
         LeveliaBackground {}
     } else {
-        NavGraphContenido(authViewModel, perfilViewModel, modifier, navController)
+        NavGraphContenido(authViewModel, perfilViewModel, misionesViewModel, modifier, navController)
     }
 }
 
@@ -82,6 +86,7 @@ fun NavGraph(
 private fun NavGraphContenido(
     authViewModel: AuthViewModel,
     perfilViewModel: PerfilViewModel,
+    misionesViewModel: MisionesViewModel,
     modifier: Modifier,
     navController: NavHostController,
 ) {
@@ -112,7 +117,10 @@ private fun NavGraphContenido(
     LaunchedEffect(navController, authViewModel) {
         authViewModel.isAuthenticated.collect { autenticado ->
             // Sin sesión no debe quedar nada del usuario anterior en el módulo Perfil
-            if (!autenticado) perfilViewModel.limpiar()
+            if (!autenticado) {
+                perfilViewModel.limpiar()
+                misionesViewModel.limpiar()
+            }
             val rutaActual = navController.currentDestination?.route ?: return@collect
             if (autenticado && rutaActual != Destinations.HomeScreen.route) {
                 navController.navigateToHomeClear()
@@ -306,6 +314,28 @@ private fun NavGraphContenido(
             )
         }
 
+        // ------------------------------ Módulo Misiones ------------------------------
+
+        composable(Destinations.MisionesScreen.route) {
+            val estado by misionesViewModel.estado.collectAsStateWithLifecycle()
+
+            // Cada vez que se abre se vuelve a leer de la base de datos
+            LaunchedEffect(Unit) { misionesViewModel.cargar() }
+
+            MisionesScreen(
+                estado = estado,
+                onBack = { navController.popBackStack() },
+                onFiltro = misionesViewModel::onFiltro,
+                // Pendiente del equipo: "Detalles de misión" (aceptar / registrar progreso). La lógica ya
+                // está en misionesViewModel.aceptar(...) y registrarProgreso(...)
+                onMision = {},
+                // Pendiente del equipo: "Crea tu propia misión" (misionesViewModel.iniciarCrear() + crearMision)
+                onCrear = {},
+                onCerrarAviso = misionesViewModel::cerrarAviso,
+                onTab = { navController.irATab(it) },
+            )
+        }
+
         // ------------------------------- Módulo Perfil -------------------------------
 
         composable(Destinations.PerfilScreen.route) {
@@ -403,9 +433,10 @@ private fun NavGraphContenido(
     }
 }
 
-/** Barra inferior: solo Inicio y Perfil tienen pantalla por ahora; las demás pestañas no hacen nada. */
+/** Barra inferior: Misiones, Inicio y Perfil tienen pantalla; Logros y Personalización todavía no hacen nada. */
 private fun NavHostController.irATab(tab: TabInferior) {
     val destino = when (tab) {
+        TabInferior.MISIONES -> Destinations.MisionesScreen.route
         TabInferior.INICIO -> Destinations.HomeScreen.route
         TabInferior.PERFIL -> Destinations.PerfilScreen.route
         else -> return
