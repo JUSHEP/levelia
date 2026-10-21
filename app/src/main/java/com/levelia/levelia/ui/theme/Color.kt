@@ -86,3 +86,14 @@ val XpRellenoAbajo = Color(0xFF02975E)
 
 val RequisitoCumplido = Color(0xFF038456)
 val RequisitoFallido = Color(0xFFCB195D)
+
+// ---------------------------------------------------------------------------------------------
+// Módulo Misiones (valores medidos del diseño del equipo, pantalla "Misiones")
+// ---------------------------------------------------------------------------------------------
+
+val MisionTarjetaFondo = Color(0xFF20064F)
+val MisionTarjetaBorde = Color(0xFF2A085A)
+val MisionPestanasFondo = Color(0xFF1F054F) // contenedor "Activas · Completadas · Todas"
+val MisionPestanaActiva = Color(0xFF039370)
+val MisionXpMas = Color(0xFF018F6D) // el "+" de "+150 XP"
+val MisionProgreso = Color(0xFF50ACC1) // "0/3"

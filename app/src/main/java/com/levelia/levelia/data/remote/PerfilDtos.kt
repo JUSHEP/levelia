@@ -1,5 +1,6 @@
 package com.levelia.levelia.data.remote
 
+import com.levelia.levelia.domain.ReglasNivel
 import com.levelia.levelia.domain.models.ProgresoData
 import com.levelia.levelia.domain.models.UserData
 import kotlinx.serialization.SerialName
@@ -50,16 +51,15 @@ data class AvatarUpdateDto(val avatar: String)
 data class PerfilRegistroUpdateDto(val nombre: String, val avatar: String)
 
 /**
- * Fila de la tabla `progreso` (user_id, nivel, xp, updated_at). La base actual no tiene
- * `xp_siguiente_nivel`: si no llega, se usa 1000 para la barra de XP del perfil.
+ * Fila de la tabla `progreso` (user_id, nivel, xp, updated_at). `xp` es la del nivel actual; la meta
+ * del nivel sale de la curva de [ReglasNivel] (la base no la guarda).
  */
 @Serializable
 data class ProgresoDto(
     @SerialName("user_id") val userId: String,
     val nivel: Int = 1,
     val xp: Int = 0,
-    @SerialName("xp_siguiente_nivel") val xpSiguienteNivel: Int = 1000,
     @SerialName("updated_at") val updatedAt: String? = null,
 ) {
-    fun aProgresoData() = ProgresoData(nivel = nivel, xp = xp, xpSiguienteNivel = xpSiguienteNivel)
+    fun aProgresoData() = ProgresoData(nivel = nivel, xp = xp, xpSiguienteNivel = ReglasNivel.xpParaSubir(nivel))
 }

@@ -38,7 +38,7 @@ Esta carpeta suele ser una copia de trabajo **sin `.git`**: el repo real es `git
 
 CI: `.github/workflows/build-apk.yml` compila `assembleDebug` (JDK 17) en cada push y publica el artefacto `levelia-apk`. Es la forma en que el equipo prueba builds cuando no tiene SDK local.
 
-SQL: `supabase/setup.sql` (esquema + RLS, se pega en el SQL Editor). `supabase/pruebas.sql` prueba RLS y reglas y termina **a propósito** con un error que contiene `PRUEBAS_OK` (así revierte todo); cualquier `FALLO: ...` es un problema real.
+SQL: `supabase/setup.sql` (esquema + RLS, se pega en el SQL Editor) y `supabase/misiones.sql` (módulo Misiones, va después; sus pruebas en `supabase/pruebas_misiones.sql`). `supabase/pruebas.sql` prueba RLS y reglas y termina **a propósito** con un error que contiene `PRUEBAS_OK` (así revierte todo); cualquier `FALLO: ...` es un problema real.
 
 ## Arquitectura
 
@@ -49,7 +49,8 @@ Reglas que requieren leer varios archivos para entenderlas:
 - **La navegación sigue al estado:** las pantallas del registro no navegan entre pasos; llaman al ViewModel y `NavGraph` observa `registerState.pasoActual`. Igual con `isAuthenticated` (→ Home/Login vaciando el back stack) y `perfilViewModel.cuentaEliminada`. Las pantallas reciben estado + lambdas, no ViewModels.
 - **Repositorio sin excepciones:** toda función de `AuthRepository` devuelve `AuthResult` (Success/Error con mensaje en español); los errores se traducen ahí. El ViewModel nunca ve excepciones.
 - **Pruebas:** los ViewModels se prueban con `AuthRepository` simulado (MockK) y `MainDispatcherRule`. No usar clases de Android en la lógica (por eso el correo se valida con `ReglasPerfil.correoValido` y no con `Patterns`). `AuthRepository` contra Supabase se prueba en el emulador, no en unitarias.
-- **Reglas duplicadas a propósito:** las reglas de nombre (3–20, letras sin tildes/números/`_`, único sin distinguir mayúsculas) y contraseña (≥ 8, mayúscula, minúscula, número) están en `domain/ReglasPerfil.kt` **y** como CHECK/funciones en `supabase/setup.sql`. Si se cambia una, cambiar la otra.
+- **Reglas duplicadas a propósito:** las reglas de nombre (3–20, letras sin tildes/números/`_`, único sin distinguir mayúsculas) y contraseña (≥ 8, mayúscula, minúscula, número) están en `domain/ReglasPerfil.kt` **y** como CHECK/funciones en `supabase/setup.sql`. Si se cambia una, cambiar la otra. Igual con la curva de niveles (`domain/ReglasNivel.kt` ↔ `xp_para_subir()`) y las veces/XP de cada dificultad (`Dificultad` ↔ `datos_dificultad()`) de `supabase/misiones.sql`.
+- **Misiones:** la app solo lee `misiones` y `misiones_usuario`; crear, aceptar, registrar progreso y reclamar XP pasan por funciones del servidor (`MisionesRepository`), que aplican las reglas y suben de nivel en `progreso`.
 - **Supabase:** `SupabaseConfig.kt` trae valores de relleno; `configurado` es false hasta pegar la URL y la clave pública (anon/publishable). Nunca usar ni pedir la `service_role` ni la contraseña de la BD. Desde la app solo se actualizan `nombre` y `avatar` de `perfiles`; `progreso` es de solo lectura; borrar cuenta usa la RPC `eliminar_mi_cuenta`.
 - **Cuenta = perfil:** el perfil se inserta en `perfiles` apenas se verifica el código (paso 2, avatar por defecto); el paso 3 solo actualiza el avatar. Una cuenta de Auth sin fila en `perfiles` no entra a la app (login y sesión guardada la rechazan); registrarse de nuevo con el mismo correo y contraseña la retoma (`retomarRegistro`).
 - **Sin conexión:** `MainActivity` superpone `SinConexionScreen` sobre todo el NavGraph mientras no haya red (`Conexion.kt`).
