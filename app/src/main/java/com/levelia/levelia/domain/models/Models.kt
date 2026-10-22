@@ -74,6 +74,7 @@ sealed class Destinations(val route: String) {
     data object CambiarContrasenaScreen : Destinations("perfil_cambiar_contrasena")
     data object CuentaEliminadaScreen : Destinations("cuenta_eliminada")
     data object MisionesScreen : Destinations("misiones")
+    data object CrearMisionScreen : Destinations("crear_mision")
 }
 
 /**
