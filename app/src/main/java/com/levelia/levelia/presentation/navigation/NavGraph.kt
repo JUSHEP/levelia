@@ -21,6 +21,7 @@ import com.levelia.levelia.domain.models.TipoDialogoPerfil
 import com.levelia.levelia.presentation.screens.CambiarAvatarScreen
 import com.levelia.levelia.presentation.screens.CambiarContrasenaScreen
 import com.levelia.levelia.presentation.screens.RecoverCodeScreen
+import com.levelia.levelia.presentation.screens.CrearMisionScreen
 import com.levelia.levelia.presentation.screens.CuentaEliminadaScreen
 import com.levelia.levelia.presentation.screens.EditarNombreScreen
 import com.levelia.levelia.presentation.screens.HomeScreen
@@ -59,6 +60,7 @@ private val RUTAS_PROTEGIDAS = listOf(
     Destinations.CambiarAvatarScreen.route,
     Destinations.CambiarContrasenaScreen.route,
     Destinations.MisionesScreen.route,
+    Destinations.CrearMisionScreen.route,
 )
 
 /**
@@ -329,10 +331,26 @@ private fun NavGraphContenido(
                 // Pendiente del equipo: "Detalles de misión" (aceptar / registrar progreso). La lógica ya
                 // está en misionesViewModel.aceptar(...) y registrarProgreso(...)
                 onMision = {},
-                // Pendiente del equipo: "Crea tu propia misión" (misionesViewModel.iniciarCrear() + crearMision)
-                onCrear = {},
+                onCrear = {
+                    misionesViewModel.iniciarCrear()
+                    navController.navigate(Destinations.CrearMisionScreen.route)
+                },
                 onCerrarAviso = misionesViewModel::cerrarAviso,
                 onTab = { navController.irATab(it) },
+            )
+        }
+
+        composable(Destinations.CrearMisionScreen.route) {
+            val crear by misionesViewModel.crear.collectAsStateWithLifecycle()
+            CrearMisionScreen(
+                state = crear,
+                onBack = { navController.popBackStack() },
+                onTitulo = misionesViewModel::onTitulo,
+                onDescripcion = misionesViewModel::onDescripcion,
+                onDificultad = misionesViewModel::onDificultad,
+                onFechaLimite = misionesViewModel::onFechaLimite,
+                // Valida el formulario y, si todo está bien, crea la misión y vuelve a la lista
+                onCrear = { misionesViewModel.crearMision { navController.popBackStack() } },
             )
         }
 
