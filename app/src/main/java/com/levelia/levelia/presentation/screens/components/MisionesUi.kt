@@ -6,6 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -19,6 +20,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.Text
@@ -42,6 +45,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
@@ -49,11 +53,16 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.levelia.levelia.R
 import com.levelia.levelia.domain.models.Dificultad
+import com.levelia.levelia.domain.models.EstadoMision
 import com.levelia.levelia.domain.models.FiltroMisiones
 import com.levelia.levelia.domain.models.IconoMision
 import com.levelia.levelia.domain.models.MisionConProgreso
 import com.levelia.levelia.ui.theme.BotonGuardar
 import com.levelia.levelia.ui.theme.CampoErrorFondo
+import com.levelia.levelia.ui.theme.DificultadDificil
+import com.levelia.levelia.ui.theme.DificultadFacil
+import com.levelia.levelia.ui.theme.DificultadMedia
+import com.levelia.levelia.ui.theme.DificultadUnica
 import com.levelia.levelia.ui.theme.EtiquetaCampo
 import com.levelia.levelia.ui.theme.MisionPestanaActiva
 import com.levelia.levelia.ui.theme.MisionPestanasFondo
@@ -62,10 +71,15 @@ import com.levelia.levelia.ui.theme.MisionTarjetaBorde
 import com.levelia.levelia.ui.theme.MisionTarjetaFondo
 import com.levelia.levelia.ui.theme.MisionXpMas
 import com.levelia.levelia.ui.theme.PerfilPanelBorde
+import com.levelia.levelia.ui.theme.PerfilPanelFondo
+import com.levelia.levelia.ui.theme.RadioDificultadAro
+import com.levelia.levelia.ui.theme.RadioDificultadVacio
 import com.levelia.levelia.ui.theme.PlaceholderGris
 import com.levelia.levelia.ui.theme.PlusJakartaSans
 import com.levelia.levelia.ui.theme.PressStart2P
 import com.levelia.levelia.ui.theme.TextoCampo
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 
 // Medidas tomadas del diseño "Misiones" del equipo (marco de 412 dp de ancho).
 
@@ -372,6 +386,168 @@ fun SelectorDificultadMision(
                     )
                 }
             }
+        }
+    }
+}
+
+// =============================================================================================
+// "Detalles de misión"
+// =============================================================================================
+
+private fun Dificultad.colorDetalle() = when (this) {
+    Dificultad.FACIL -> DificultadFacil
+    Dificultad.MEDIA -> DificultadMedia
+    Dificultad.DIFICIL -> DificultadDificil
+    Dificultad.UNICA -> DificultadUnica
+}
+
+private fun EstadoMision.textoDetalle() = when (this) {
+    EstadoMision.ACTIVA -> "En progreso"
+    EstadoMision.COMPLETADA -> "Completada"
+    EstadoMision.PERDIDA -> "Fallida"
+}
+
+/**
+ * Cuadro oscuro con Dificultad, Recompensa, Frecuencia y, solo si la misión ya se aceptó ([estado] no es
+ * null), Estado. La dificultad va del color de su nivel.
+ */
+@Composable
+fun TarjetaDetalleMision(
+    dificultad: Dificultad,
+    xp: Int,
+    meta: Int,
+    fechaLimite: LocalDate?,
+    estado: EstadoMision?,
+    modifier: Modifier = Modifier,
+    /** "1/3" mientras la misión está en curso (null = no se muestra). */
+    progreso: String? = null,
+) {
+    val forma = RoundedCornerShape(14.dp)
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(forma)
+            .background(PerfilPanelFondo)
+            .border(2.dp, PerfilPanelBorde, forma)
+            .padding(horizontal = 20.dp, vertical = 12.dp),
+    ) {
+        FilaDetalleMision("Dificultad", dificultad.textoFormulario(), dificultad.colorDetalle())
+        FilaDetalleMision("Recompensa", "+$xp XP")
+        // Por veces: "3/Semana". La única se cumple una sola vez: se muestra su fecha límite en negrilla
+        if (dificultad == Dificultad.UNICA) {
+            FilaDetalleMision(
+                "Frecuencia",
+                fechaLimite?.format(DateTimeFormatter.ofPattern("dd/MM/yyyy")) ?: "--",
+                negrilla = true,
+            )
+        } else {
+            FilaDetalleMision("Frecuencia", "$meta/Semana")
+        }
+        if (estado != null) FilaDetalleMision("Estado", estado.textoDetalle())
+        if (progreso != null) FilaDetalleMision("Progreso", progreso)
+    }
+}
+
+@Composable
+private fun FilaDetalleMision(
+    etiqueta: String,
+    valor: String,
+    colorValor: Color = Color.White,
+    negrilla: Boolean = false,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().height(34.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(etiqueta, color = Color.White, fontFamily = PressStart2P, fontSize = 12.sp, modifier = Modifier.weight(1f))
+        Text(
+            valor,
+            color = colorValor,
+            fontFamily = PlusJakartaSans,
+            fontSize = 20.sp,
+            fontWeight = if (negrilla) FontWeight.Bold else null,
+            textAlign = TextAlign.Center,
+            maxLines = 1,
+            modifier = Modifier.weight(1f),
+        )
+    }
+}
+
+// =============================================================================================
+// "Ajustes de misión"
+// =============================================================================================
+
+/**
+ * Opción de dificultad: círculo a la izquierda (marcado o vacío), nombre con el color del nivel, veces por
+ * semana y XP. Toda la tarjeta es tocable. Los números salen de [Dificultad] (iguales a los del servidor).
+ */
+@Composable
+fun TarjetaDificultadMision(
+    dificultad: Dificultad,
+    seleccionada: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val forma = RoundedCornerShape(16.dp)
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(124.dp)
+            .clip(forma)
+            .background(PerfilPanelFondo)
+            .border(2.dp, PerfilPanelBorde, forma)
+            .selectable(selected = seleccionada, role = Role.RadioButton, onClick = onClick),
+    ) {
+        Box(modifier = Modifier.align(Alignment.CenterStart).padding(start = 16.dp)) {
+            RadioDificultad(seleccionada)
+        }
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(start = 61.dp, end = 18.dp, top = 14.dp, bottom = 20.dp),
+            verticalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(
+                dificultad.textoFormulario(),
+                color = dificultad.colorDetalle(),
+                fontFamily = PlusJakartaSans,
+                fontSize = 22.sp,
+            )
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(
+                    if (dificultad.veces == 1) "1 vez/Semana" else "${dificultad.veces} veces/Semana",
+                    color = Color.White,
+                    fontFamily = PlusJakartaSans,
+                    fontSize = 22.sp,
+                    modifier = Modifier.alignByBaseline(),
+                )
+                Text(
+                    "+${dificultad.xp} XP",
+                    color = Color.White,
+                    fontFamily = PlusJakartaSans,
+                    fontSize = 18.sp,
+                    modifier = Modifier.alignByBaseline(),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun RadioDificultad(seleccionada: Boolean) {
+    if (seleccionada) {
+        Image(
+            bitmap = ImageBitmap.imageResource(R.drawable.ic_dialog_ok),
+            contentDescription = "Seleccionada",
+            filterQuality = FilterQuality.None,
+            modifier = Modifier.size(36.dp),
+        )
+    } else {
+        Box(
+            modifier = Modifier.size(36.dp).clip(CircleShape).background(RadioDificultadAro),
+            contentAlignment = Alignment.Center,
+        ) {
+            Box(modifier = Modifier.size(24.dp).clip(CircleShape).background(RadioDificultadVacio))
         }
     }
 }
