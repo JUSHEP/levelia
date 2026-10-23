@@ -12,16 +12,22 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.levelia.levelia.domain.ReglasPerfil
 import com.levelia.levelia.domain.models.Destinations
+import com.levelia.levelia.domain.models.Dificultad
 import com.levelia.levelia.domain.models.TipoDialogoPerfil
 import com.levelia.levelia.presentation.screens.CambiarAvatarScreen
 import com.levelia.levelia.presentation.screens.CambiarContrasenaScreen
 import com.levelia.levelia.presentation.screens.RecoverCodeScreen
+import com.levelia.levelia.presentation.screens.CrearMisionScreen
+import com.levelia.levelia.presentation.screens.AjustarDificultadScreen
 import com.levelia.levelia.presentation.screens.CuentaEliminadaScreen
+import com.levelia.levelia.presentation.screens.DetallesMisionScreen
 import com.levelia.levelia.presentation.screens.EditarNombreScreen
 import com.levelia.levelia.presentation.screens.HomeScreen
 import com.levelia.levelia.presentation.screens.LoginScreen
@@ -52,6 +58,9 @@ private val RUTAS_REGISTRO = listOf(
 private const val DURACION_TRANSICION = 300
 
 // Pantallas que solo se ven con sesión iniciada
+/** Clave con la que "Ajustes de misión" le deja la dificultad elegida a "Detalles de misión". */
+private const val CLAVE_DIFICULTAD_ELEGIDA = "dificultad_elegida"
+
 private val RUTAS_PROTEGIDAS = listOf(
     Destinations.HomeScreen.route,
     Destinations.PerfilScreen.route,
@@ -59,6 +68,9 @@ private val RUTAS_PROTEGIDAS = listOf(
     Destinations.CambiarAvatarScreen.route,
     Destinations.CambiarContrasenaScreen.route,
     Destinations.MisionesScreen.route,
+    Destinations.CrearMisionScreen.route,
+    Destinations.DetallesMisionScreen.route,
+    Destinations.AjustarDificultadScreen.route,
 )
 
 /**
@@ -326,13 +338,86 @@ private fun NavGraphContenido(
                 estado = estado,
                 onBack = { navController.popBackStack() },
                 onFiltro = misionesViewModel::onFiltro,
-                // Pendiente del equipo: "Detalles de misión" (aceptar / registrar progreso). La lógica ya
-                // está en misionesViewModel.aceptar(...) y registrarProgreso(...)
-                onMision = {},
-                // Pendiente del equipo: "Crea tu propia misión" (misionesViewModel.iniciarCrear() + crearMision)
-                onCrear = {},
+                onMision = { navController.navigate(Destinations.DetallesMisionScreen.conId(it.mision.id)) },
+                onCrear = {
+                    misionesViewModel.iniciarCrear()
+                    navController.navigate(Destinations.CrearMisionScreen.route)
+                },
                 onCerrarAviso = misionesViewModel::cerrarAviso,
                 onTab = { navController.irATab(it) },
+            )
+        }
+
+        composable(
+            route = Destinations.DetallesMisionScreen.route,
+            arguments = listOf(navArgument("misionId") { type = NavType.LongType }),
+        ) { entrada ->
+            val misionId = entrada.arguments?.getLong("misionId") ?: 0L
+            val estado by misionesViewModel.estado.collectAsStateWithLifecycle()
+            val item = estado.misiones.firstOrNull { it.mision.id == misionId }
+            // La dificultad que dejó "Ajustes de misión"; se envía a la base al aceptar
+            val elegida by entrada.savedStateHandle
+                .getStateFlow<String?>(CLAVE_DIFICULTAD_ELEGIDA, null)
+                .collectAsStateWithLifecycle()
+            val dificultadElegida = elegida?.let { nombre -> Dificultad.entries.firstOrNull { it.name == nombre } }
+
+            if (item == null) {
+                // La misión ya no está en la lista: no hay nada que mostrar
+                LaunchedEffect(Unit) { navController.popBackStack() }
+            } else {
+                DetallesMisionScreen(
+                    item = item,
+                    enviando = estado.enviando,
+                    error = estado.error,
+                    onBack = { navController.popBackStack() },
+                    // Acepta con la dificultad elegida (null = la que ya tenía) y vuelve a la lista
+                    onAceptar = { misionesViewModel.aceptar(misionId, dificultadElegida) { navController.popBackStack() } },
+                    onAjustarDificultad = { navController.navigate(Destinations.AjustarDificultadScreen.conId(misionId)) },
+                    onCerrarAviso = misionesViewModel::cerrarAviso,
+                    onTab = { navController.irATab(it) },
+                    dificultadElegida = dificultadElegida,
+                )
+            }
+        }
+
+        composable(
+            route = Destinations.AjustarDificultadScreen.route,
+            arguments = listOf(navArgument("misionId") { type = NavType.LongType }),
+        ) { entrada ->
+            val misionId = entrada.arguments?.getLong("misionId") ?: 0L
+            val estado by misionesViewModel.estado.collectAsStateWithLifecycle()
+            val item = estado.misiones.firstOrNull { it.mision.id == misionId }
+            // La pantalla de detalles que la abrió: ahí se deja la dificultad elegida
+            val detalles = remember { navController.previousBackStackEntry }
+
+            if (item == null) {
+                LaunchedEffect(Unit) { navController.popBackStack() }
+            } else {
+                val yaElegida = detalles?.savedStateHandle?.get<String>(CLAVE_DIFICULTAD_ELEGIDA)
+                    ?.let { nombre -> Dificultad.entries.firstOrNull { it.name == nombre } }
+                AjustarDificultadScreen(
+                    dificultadInicial = yaElegida ?: item.mision.dificultad,
+                    onGuardar = { dificultad ->
+                        detalles?.savedStateHandle?.set(CLAVE_DIFICULTAD_ELEGIDA, dificultad.name)
+                        navController.popBackStack()
+                    },
+                    onBack = { navController.popBackStack() },
+                    onTab = { navController.irATab(it) },
+                )
+            }
+        }
+
+        composable(Destinations.CrearMisionScreen.route) {
+            val crear by misionesViewModel.crear.collectAsStateWithLifecycle()
+            CrearMisionScreen(
+                state = crear,
+                onBack = { navController.popBackStack() },
+                onTitulo = misionesViewModel::onTitulo,
+                onDescripcion = misionesViewModel::onDescripcion,
+                onDificultad = misionesViewModel::onDificultad,
+                onFechaLimite = misionesViewModel::onFechaLimite,
+                // Valida el formulario y, si todo está bien, crea la misión y vuelve a la lista
+                onCrear = { misionesViewModel.crearMision { navController.popBackStack() } },
             )
         }
 

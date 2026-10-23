@@ -74,6 +74,13 @@ sealed class Destinations(val route: String) {
     data object CambiarContrasenaScreen : Destinations("perfil_cambiar_contrasena")
     data object CuentaEliminadaScreen : Destinations("cuenta_eliminada")
     data object MisionesScreen : Destinations("misiones")
+    data object CrearMisionScreen : Destinations("crear_mision")
+    data object DetallesMisionScreen : Destinations("detalles_mision/{misionId}") {
+        fun conId(misionId: Long) = "detalles_mision/$misionId"
+    }
+    data object AjustarDificultadScreen : Destinations("ajustar_dificultad/{misionId}") {
+        fun conId(misionId: Long) = "ajustar_dificultad/$misionId"
+    }
 }
 
 /**

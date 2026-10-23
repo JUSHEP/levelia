@@ -97,3 +97,13 @@ val MisionPestanasFondo = Color(0xFF1F054F) // contenedor "Activas · Completada
 val MisionPestanaActiva = Color(0xFF039370)
 val MisionXpMas = Color(0xFF018F6D) // el "+" de "+150 XP"
 val MisionProgreso = Color(0xFF50ACC1) // "0/3"
+
+// Nombre de la dificultad en "Detalles de misión"
+val DificultadFacil = Color(0xFF3A945D)
+val DificultadMedia = Color(0xFFD28B3A)
+val DificultadDificil = Color(0xFFDD5F5F)
+val DificultadUnica = Color(0xFFEA48F8)
+
+// Círculo sin marcar de "Ajustes de misión" (el marcado usa ic_dialog_ok)
+val RadioDificultadAro = Color(0xFF645980)
+val RadioDificultadVacio = Color(0xFFD9D9D9)
