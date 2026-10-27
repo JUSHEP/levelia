@@ -14,10 +14,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.levelia.levelia.domain.models.DialogoPerfil
 import com.levelia.levelia.domain.models.Dificultad
+import com.levelia.levelia.domain.models.TipoDialogoPerfil
 import com.levelia.levelia.presentation.screens.components.BarraInferior
 import com.levelia.levelia.presentation.screens.components.BotonPerfil
 import com.levelia.levelia.presentation.screens.components.BurbujasDecorativas
+import com.levelia.levelia.presentation.screens.components.DialogoPerfilUi
 import com.levelia.levelia.presentation.screens.components.LeveliaScreen
 import com.levelia.levelia.presentation.screens.components.MARGEN_MISIONES
 import com.levelia.levelia.presentation.screens.components.PieDePantalla
@@ -37,6 +40,10 @@ fun AjustarDificultadScreen(
     onGuardar: (Dificultad) -> Unit,
     onBack: () -> Unit,
     onTab: (TabInferior) -> Unit,
+    /** Guardando en la base: el botón muestra la carga. */
+    guardando: Boolean = false,
+    error: String? = null,
+    onCerrarAviso: () -> Unit = {},
 ) {
     var seleccion by rememberSaveable { mutableStateOf(dificultadInicial) }
 
@@ -55,6 +62,13 @@ fun AjustarDificultadScreen(
         margenHorizontal = MARGEN_MISIONES,
         decoracion = { BurbujasDecorativas() },
         barraInferior = barra,
+        overlay = {
+            DialogoPerfilUi(
+                dialogo = error?.let { DialogoPerfil(TipoDialogoPerfil.ERROR_SERVIDOR, it) },
+                onCerrar = onCerrarAviso,
+                onConfirmarEliminar = {},
+            )
+        },
     ) {
         TituloPixel(
             "Ajustes de misión",
@@ -84,6 +98,6 @@ fun AjustarDificultadScreen(
         }
         Spacer(Modifier.height(17.dp))
 
-        BotonPerfil(texto = "Guardar cambios", onClick = { onGuardar(seleccion) }, color = BotonGuardar)
+        BotonPerfil(texto = "Guardar cambios", onClick = { onGuardar(seleccion) }, color = BotonGuardar, cargando = guardando)
     }
 }

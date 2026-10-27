@@ -6,6 +6,8 @@ declare
   a uuid := '00000000-0000-0000-0000-0000000000b1';
   b uuid := '00000000-0000-0000-0000-0000000000b2';
   gym bigint;
+  clases bigint;
+  enfoque bigint;
   propia bigint;
   unica bigint;
   mu public.misiones_usuario;
@@ -29,6 +31,8 @@ begin
 
   select id into gym from public.misiones where user_id is null and titulo = 'Ir al gym';
   if gym is null then raise exception 'FALLO: falta la misión predefinida Ir al gym'; end if;
+  select id into clases from public.misiones where user_id is null and titulo = 'A clases';
+  select id into enfoque from public.misiones where user_id is null and titulo = 'Modo enfoque';
 
   -- ===== Usuario A =====
   set local role authenticated;
@@ -99,12 +103,45 @@ begin
   select * into r from public.registrar_progreso(mu2.id);  -- UNICA antes de la fecha
   if r.estado <> 'COMPLETADA' then raise exception 'FALLO: UNICA a tiempo no se completó'; end if;
 
+  -- 4b) Ajustes de misión: se guarda sin aceptar y aceptar usa la guardada
+  perform public.ajustar_dificultad(clases, 'DIFICIL');
+  select count(*) into n from public.misiones_preferencias where mision_id = clases;
+  if n <> 1 then raise exception 'FALLO: ajustar_dificultad no guardó la preferencia'; end if;
+  select count(*) into n from public.misiones_usuario where mision_id = clases;
+  if n <> 0 then raise exception 'FALLO: ajustar_dificultad aceptó la misión'; end if;
+  select * into r from public.aceptar_mision(clases);
+  if r.dificultad <> 'DIFICIL' or r.meta <> 5 or r.xp <> 300 then
+    raise exception 'FALLO: aceptar no usó la dificultad guardada (%, %, %)', r.dificultad, r.meta, r.xp;
+  end if;
+  fallo := false;
+  begin perform public.ajustar_dificultad(clases, 'FACIL'); exception when others then fallo := sqlerrm = 'MISION_YA_ACTIVA'; end;
+  if not fallo then raise exception 'FALLO: ajustó una misión en curso'; end if;
+  fallo := false;
+  begin perform public.ajustar_dificultad(unica, 'MEDIA'); exception when others then fallo := sqlerrm = 'DIFICULTAD_INVALIDA'; end;
+  if not fallo then raise exception 'FALLO: ajustó una misión UNICA'; end if;
+  fallo := false;
+  begin perform public.ajustar_dificultad(enfoque, 'UNICA'); exception when others then fallo := sqlerrm = 'DIFICULTAD_INVALIDA'; end;
+  if not fallo then raise exception 'FALLO: ajustó a UNICA'; end if;
+  -- Volver a la dificultad de la misión borra la preferencia (reaparecen sus veces y XP originales)
+  perform public.ajustar_dificultad(enfoque, 'MEDIA');
+  perform public.ajustar_dificultad(enfoque, 'FACIL');
+  select count(*) into n from public.misiones_preferencias where mision_id = enfoque;
+  if n <> 0 then raise exception 'FALLO: volver a la dificultad original no borró la preferencia'; end if;
+  perform public.ajustar_dificultad(enfoque, 'DIFICIL');
+
   -- 5) B no ve ni toca lo de A
   perform set_config('request.jwt.claims', json_build_object('sub', b, 'role', 'authenticated')::text, true);
   select count(*) into n from public.misiones where user_id = a;
   if n <> 0 then raise exception 'FALLO: B ve misiones creadas por A'; end if;
   select count(*) into n from public.misiones_usuario;
   if n <> 0 then raise exception 'FALLO: B ve misiones aceptadas por A'; end if;
+  select count(*) into n from public.misiones_preferencias;
+  if n <> 0 then raise exception 'FALLO: B ve las dificultades guardadas por A'; end if;
+  begin
+    insert into public.misiones_preferencias (user_id, mision_id, dificultad) values (b, enfoque, 'MEDIA');
+    raise exception 'FALLO: B escribió en misiones_preferencias sin la función';
+  exception when insufficient_privilege then null;
+  end;
   fallo := false;
   begin perform public.registrar_progreso(mu.id); exception when others then fallo := sqlerrm = 'MISION_NO_EXISTE'; end;
   if not fallo then raise exception 'FALLO: B registró progreso en una misión de A'; end if;
@@ -163,6 +200,8 @@ begin
   if n <> 0 then raise exception 'FALLO: quedaron misiones de una cuenta borrada'; end if;
   select count(*) into n from public.misiones_usuario where user_id = a;
   if n <> 0 then raise exception 'FALLO: quedó progreso de misiones de una cuenta borrada'; end if;
+  select count(*) into n from public.misiones_preferencias where user_id = a;
+  if n <> 0 then raise exception 'FALLO: quedaron dificultades guardadas de una cuenta borrada'; end if;
 
   raise exception 'PRUEBAS_OK: todas las pruebas de misiones pasaron (este error revierte los datos de prueba)';
 end;

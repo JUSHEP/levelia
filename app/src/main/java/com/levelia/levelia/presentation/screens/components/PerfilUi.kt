@@ -73,8 +73,6 @@ import com.levelia.levelia.ui.theme.PerfilTarjetaBorde
 import com.levelia.levelia.ui.theme.PerfilTarjetaFondo
 import com.levelia.levelia.ui.theme.PlusJakartaSans
 import com.levelia.levelia.ui.theme.PressStart2P
-import com.levelia.levelia.ui.theme.RequisitoCumplido
-import com.levelia.levelia.ui.theme.RequisitoFallido
 import com.levelia.levelia.ui.theme.XpPistaBorde
 import com.levelia.levelia.ui.theme.XpPistaFondo
 import com.levelia.levelia.ui.theme.XpRellenoAbajo
@@ -350,7 +348,10 @@ fun ContadorCaracteres(actual: Int, maximo: Int, modifier: Modifier = Modifier) 
     )
 }
 
-/** Fila de la lista de requisitos de la contraseña: casilla verde con palomita o roja con X. */
+/**
+ * Fila de la lista de requisitos de la contraseña: casilla verde con palomita o roja con X. El texto
+ * siempre blanco y en negrita (pedido del equipo): solo la casilla cambia al cumplirse.
+ */
 @Composable
 fun RequisitoContrasena(texto: String, cumplido: Boolean, modifier: Modifier = Modifier) {
     Row(modifier = modifier.fillMaxWidth().height(24.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -362,8 +363,9 @@ fun RequisitoContrasena(texto: String, cumplido: Boolean, modifier: Modifier = M
         )
         Text(
             texto,
-            color = if (cumplido) RequisitoCumplido else RequisitoFallido,
+            color = Color.White,
             fontFamily = PlusJakartaSans,
+            fontWeight = FontWeight.Bold,
             fontSize = 12.sp,
             modifier = Modifier.padding(start = 6.dp),
         )

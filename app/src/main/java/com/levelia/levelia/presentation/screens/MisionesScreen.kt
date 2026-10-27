@@ -16,6 +16,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.levelia.levelia.R
 import com.levelia.levelia.domain.models.DialogoPerfil
 import com.levelia.levelia.domain.models.FiltroMisiones
 import com.levelia.levelia.domain.models.MisionConProgreso
@@ -24,6 +25,8 @@ import com.levelia.levelia.domain.models.TipoDialogoPerfil
 import com.levelia.levelia.presentation.screens.components.ALTO_BARRA_INFERIOR
 import com.levelia.levelia.presentation.screens.components.BarraInferior
 import com.levelia.levelia.presentation.screens.components.BotonCrearMision
+import com.levelia.levelia.presentation.screens.components.BotonReclamarRecompensa
+import com.levelia.levelia.presentation.screens.components.LeveliaDialog
 import com.levelia.levelia.presentation.screens.components.BurbujasDecorativas
 import com.levelia.levelia.presentation.screens.components.DialogoPerfilUi
 import com.levelia.levelia.presentation.screens.components.LeveliaScreen
@@ -33,12 +36,13 @@ import com.levelia.levelia.presentation.screens.components.PieDePantalla
 import com.levelia.levelia.presentation.screens.components.TabInferior
 import com.levelia.levelia.presentation.screens.components.TarjetaMision
 import com.levelia.levelia.presentation.screens.components.TituloPixel
+import com.levelia.levelia.ui.theme.BotonGuardar
 import com.levelia.levelia.ui.theme.PlusJakartaSans
 
 /**
  * "Misiones": las predefinidas y las propias, con pestañas y el botón para crear una. Recibe estado +
- * lambdas (los datos los trae MisionesViewModel). El diseño de las tarjetas cumplidas (verdes, con
- * palomita) y el botón "¡Reclamar recompensa!" todavía no están: por ahora todas usan la tarjeta normal.
+ * lambdas (los datos los trae MisionesViewModel). Las cumplidas se ven verdes con palomita y, en
+ * "Completadas", "¡Reclamar recompensa!" suma la XP y muestra el nivel alcanzado.
  */
 @Composable
 fun MisionesScreen(
@@ -47,6 +51,7 @@ fun MisionesScreen(
     onFiltro: (FiltroMisiones) -> Unit,
     onMision: (MisionConProgreso) -> Unit,
     onCrear: () -> Unit,
+    onReclamar: () -> Unit,
     onCerrarAviso: () -> Unit,
     onTab: (TabInferior) -> Unit,
 ) {
@@ -76,6 +81,19 @@ fun MisionesScreen(
                 onCerrar = onCerrarAviso,
                 onConfirmarEliminar = {},
             )
+            // Textos provisionales: el diseño no trae este aviso (confirmar con el equipo)
+            estado.recompensa?.let { r ->
+                LeveliaDialog(
+                    titulo = "¡Recompensa reclamada!",
+                    mensaje = "Ganaste +${r.xpGanada} XP." +
+                        if (r.nivelesSubidos > 0) " ¡Subiste al nivel ${r.nivel}!" else " Sigues en el nivel ${r.nivel}.",
+                    icono = R.drawable.ic_dialog_ok,
+                    onEntendido = onCerrarAviso,
+                    textoBoton = "Aceptar",
+                    altoIcono = 50.dp,
+                    colorBoton = BotonGuardar,
+                )
+            }
         },
     ) {
         TituloPixel("Misiones", tamano = 24.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
@@ -101,6 +119,11 @@ fun MisionesScreen(
         estado.visibles.forEach { item ->
             TarjetaMision(item = item, onClick = { onMision(item) })
             Spacer(Modifier.height(28.dp))
+        }
+        // En "Completadas", con XP por reclamar (en el diseño va justo debajo de la lista)
+        if (estado.filtro == FiltroMisiones.COMPLETADAS && estado.hayRecompensas) {
+            BotonReclamarRecompensa(onClick = onReclamar, cargando = estado.enviando)
+            Spacer(Modifier.height(16.dp))
         }
         // Que la última tarjeta no quede tapada por el botón de crear
         Spacer(Modifier.height(56.dp))

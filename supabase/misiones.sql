@@ -9,7 +9,9 @@
 --   misiones_usuario   cada misión ACEPTADA por un usuario, con su progreso y estado
 --   xp_para_subir()    XP que pide un nivel para pasar al siguiente (curva exponencial)
 --   crear_mision()     "Crea tu propia misión"
---   aceptar_mision()   "Aceptar misión" (opcionalmente con la dificultad de "Ajustar dificultad")
+--   misiones_preferencias la dificultad que cada usuario guardó en "Ajustes de misión" (sin aceptarla)
+--   ajustar_dificultad() "Guardar cambios" de Ajustes de misión
+--   aceptar_mision()   "Aceptar misión" (con la dificultad guardada, si hay)
 --   registrar_progreso() "Registrar progreso +"
 --   vencer_mis_misiones() marca como perdidas las que pasaron su fecha límite
 --   reclamar_recompensas() "¡Reclamar recompensa!": suma la XP y sube de nivel
@@ -135,6 +137,32 @@ create policy "misiones_usuario_select_propias"
   using (user_id = (select auth.uid()));
 
 -- -----------------------------------------------------------------------------
+-- 2b. misiones_preferencias ("Ajustes de misión" guardado sin aceptar; versión 4, 2026-10-27)
+-- Las predefinidas son de todos: la dificultad elegida se guarda aparte, por usuario.
+-- -----------------------------------------------------------------------------
+create table if not exists public.misiones_preferencias (
+  user_id    uuid        not null references public.perfiles (id) on delete cascade,
+  mision_id  bigint      not null references public.misiones (id) on delete cascade,
+  dificultad text        not null check (dificultad in ('FACIL', 'MEDIA', 'DIFICIL')),
+  updated_at timestamptz not null default now(),
+  primary key (user_id, mision_id)
+);
+
+comment on table public.misiones_preferencias is
+  'Dificultad elegida en "Ajustes de misión" antes de aceptar. Solo se escribe con ajustar_dificultad().';
+
+create index if not exists misiones_preferencias_mision_id on public.misiones_preferencias (mision_id);
+
+alter table public.misiones_preferencias enable row level security;
+revoke all on public.misiones_preferencias from anon, authenticated;
+grant select on public.misiones_preferencias to authenticated;
+
+drop policy if exists "misiones_preferencias_select_propias" on public.misiones_preferencias;
+create policy "misiones_preferencias_select_propias"
+  on public.misiones_preferencias for select to authenticated
+  using (user_id = (select auth.uid()));
+
+-- -----------------------------------------------------------------------------
 -- 3. Funciones que usa la app
 -- Los errores esperados usan códigos en MAYÚSCULAS que la app traduce (MisionesRepository).
 -- -----------------------------------------------------------------------------
@@ -248,7 +276,12 @@ begin
     raise exception 'MISION_EN_CURSO';
   end if;
 
-  v_dif := coalesce(p_dificultad, v_mision.dificultad);
+  -- Sin dificultad explícita: la guardada en "Ajustes de misión"; si no hay, la de la misión
+  v_dif := coalesce(
+    p_dificultad,
+    (select mp.dificultad from public.misiones_preferencias mp where mp.user_id = v_id and mp.mision_id = p_mision_id),
+    v_mision.dificultad
+  );
   if v_dif = v_mision.dificultad then
     v_meta := v_mision.meta;
     v_xp := v_mision.xp;
@@ -351,6 +384,49 @@ begin
   end if;
 end;
 $$;
+
+-- "Guardar cambios" de Ajustes de misión: guarda la dificultad SIN aceptar la misión. Volver a la de la
+-- misión borra la preferencia (así reaparecen sus veces y XP originales).
+create or replace function public.ajustar_dificultad(p_mision_id bigint, p_dificultad text)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_id     uuid := auth.uid();
+  v_mision public.misiones;
+begin
+  if v_id is null then raise exception 'SIN_SESION' using errcode = '28000'; end if;
+
+  select * into v_mision from public.misiones
+   where id = p_mision_id and (user_id is null or user_id = v_id);
+  if not found then raise exception 'MISION_NO_EXISTE'; end if;
+
+  -- UNICA no se ajusta (necesita fecha) y no se puede pasar a UNICA
+  if v_mision.dificultad = 'UNICA' or p_dificultad is null or p_dificultad not in ('FACIL', 'MEDIA', 'DIFICIL') then
+    raise exception 'DIFICULTAD_INVALIDA';
+  end if;
+
+  -- En curso ya tiene sus veces y XP: se ajusta antes de aceptarla
+  perform public.vencer_mis_misiones();
+  if exists (select 1 from public.misiones_usuario
+              where user_id = v_id and mision_id = p_mision_id and estado = 'ACTIVA') then
+    raise exception 'MISION_YA_ACTIVA';
+  end if;
+
+  if p_dificultad = v_mision.dificultad then
+    delete from public.misiones_preferencias where user_id = v_id and mision_id = p_mision_id;
+  else
+    insert into public.misiones_preferencias (user_id, mision_id, dificultad)
+    values (v_id, p_mision_id, p_dificultad)
+    on conflict (user_id, mision_id) do update set dificultad = excluded.dificultad, updated_at = now();
+  end if;
+end;
+$$;
+
+revoke all on function public.ajustar_dificultad(bigint, text) from public, anon;
+grant execute on function public.ajustar_dificultad(bigint, text) to authenticated;
 
 revoke all on function public.datos_dificultad(text) from public, anon;
 revoke all on function public.vencer_mis_misiones() from public, anon;

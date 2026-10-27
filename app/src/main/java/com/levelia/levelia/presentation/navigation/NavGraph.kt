@@ -19,7 +19,6 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.levelia.levelia.domain.ReglasPerfil
 import com.levelia.levelia.domain.models.Destinations
-import com.levelia.levelia.domain.models.Dificultad
 import com.levelia.levelia.domain.models.EstadoMision
 import com.levelia.levelia.domain.models.TipoDialogoPerfil
 import com.levelia.levelia.presentation.screens.CambiarAvatarScreen
@@ -59,9 +58,6 @@ private val RUTAS_REGISTRO = listOf(
 private const val DURACION_TRANSICION = 300
 
 // Pantallas que solo se ven con sesión iniciada
-/** Clave con la que "Ajustes de misión" le deja la dificultad elegida a "Detalles de misión". */
-private const val CLAVE_DIFICULTAD_ELEGIDA = "dificultad_elegida"
-
 private val RUTAS_PROTEGIDAS = listOf(
     Destinations.HomeScreen.route,
     Destinations.PerfilScreen.route,
@@ -344,6 +340,7 @@ private fun NavGraphContenido(
                     misionesViewModel.iniciarCrear()
                     navController.navigate(Destinations.CrearMisionScreen.route)
                 },
+                onReclamar = misionesViewModel::reclamar,
                 onCerrarAviso = misionesViewModel::cerrarAviso,
                 onTab = { navController.irATab(it) },
             )
@@ -356,12 +353,6 @@ private fun NavGraphContenido(
             val misionId = entrada.arguments?.getLong("misionId") ?: 0L
             val estado by misionesViewModel.estado.collectAsStateWithLifecycle()
             val item = estado.misiones.firstOrNull { it.mision.id == misionId }
-            // La dificultad que dejó "Ajustes de misión"; se envía a la base al aceptar
-            val elegida by entrada.savedStateHandle
-                .getStateFlow<String?>(CLAVE_DIFICULTAD_ELEGIDA, null)
-                .collectAsStateWithLifecycle()
-            val dificultadElegida = elegida?.let { nombre -> Dificultad.entries.firstOrNull { it.name == nombre } }
-
             if (item == null) {
                 // La misión ya no está en la lista: no hay nada que mostrar
                 LaunchedEffect(Unit) { navController.popBackStack() }
@@ -371,13 +362,9 @@ private fun NavGraphContenido(
                     enviando = estado.enviando,
                     error = estado.error,
                     onBack = { navController.popBackStack() },
-                    // Acepta con la dificultad elegida (null = la que ya tenía) y se queda en el detalle,
-                    // que ahora muestra "Aumentar progreso" en lugar de "Aceptar" / "Ajustar dificultad"
-                    onAceptar = {
-                        misionesViewModel.aceptar(misionId, dificultadElegida) {
-                            entrada.savedStateHandle[CLAVE_DIFICULTAD_ELEGIDA] = null
-                        }
-                    },
+                    // Acepta con la dificultad guardada en "Ajustes de misión" (la aplica el servidor) y se
+                    // queda en el detalle, que ahora muestra "Aumentar progreso"
+                    onAceptar = { misionesViewModel.aceptar(misionId) },
                     onAjustarDificultad = { navController.navigate(Destinations.AjustarDificultadScreen.conId(misionId)) },
                     // Suma 1 al progreso y se queda en el detalle; si con eso se cumplió, vuelve a la lista
                     // para reclamar la recompensa
@@ -391,7 +378,6 @@ private fun NavGraphContenido(
                     },
                     onCerrarAviso = misionesViewModel::cerrarAviso,
                     onTab = { navController.irATab(it) },
-                    dificultadElegida = dificultadElegida,
                     hoy = estado.hoy,
                 )
             }
@@ -404,22 +390,23 @@ private fun NavGraphContenido(
             val misionId = entrada.arguments?.getLong("misionId") ?: 0L
             val estado by misionesViewModel.estado.collectAsStateWithLifecycle()
             val item = estado.misiones.firstOrNull { it.mision.id == misionId }
-            // La pantalla de detalles que la abrió: ahí se deja la dificultad elegida
-            val detalles = remember { navController.previousBackStackEntry }
-
             if (item == null) {
                 LaunchedEffect(Unit) { navController.popBackStack() }
             } else {
-                val yaElegida = detalles?.savedStateHandle?.get<String>(CLAVE_DIFICULTAD_ELEGIDA)
-                    ?.let { nombre -> Dificultad.entries.firstOrNull { it.name == nombre } }
                 AjustarDificultadScreen(
-                    dificultadInicial = yaElegida ?: item.mision.dificultad,
+                    // La guardada en la base (la lista ya la trae aplicada) o la de la misión
+                    dificultadInicial = item.mision.dificultad,
+                    // Guarda en la base sin aceptar y vuelve a la lista, que se relee con las veces y XP nuevas
                     onGuardar = { dificultad ->
-                        detalles?.savedStateHandle?.set(CLAVE_DIFICULTAD_ELEGIDA, dificultad.name)
-                        navController.popBackStack()
+                        misionesViewModel.ajustarDificultad(misionId, dificultad) {
+                            navController.popBackStack(Destinations.MisionesScreen.route, inclusive = false)
+                        }
                     },
                     onBack = { navController.popBackStack() },
                     onTab = { navController.irATab(it) },
+                    guardando = estado.enviando,
+                    error = estado.error,
+                    onCerrarAviso = misionesViewModel::cerrarAviso,
                 )
             }
         }

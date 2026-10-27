@@ -24,6 +24,7 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.Composable
@@ -64,6 +65,10 @@ import com.levelia.levelia.ui.theme.DificultadFacil
 import com.levelia.levelia.ui.theme.DificultadMedia
 import com.levelia.levelia.ui.theme.DificultadUnica
 import com.levelia.levelia.ui.theme.EtiquetaCampo
+import com.levelia.levelia.ui.theme.MisionCumplidaBorde
+import com.levelia.levelia.ui.theme.MisionCumplidaFondo
+import com.levelia.levelia.ui.theme.MisionCumplidaMas
+import com.levelia.levelia.ui.theme.MisionCumplidaProgreso
 import com.levelia.levelia.ui.theme.MisionPestanaActiva
 import com.levelia.levelia.ui.theme.MisionPestanasFondo
 import com.levelia.levelia.ui.theme.MisionProgreso
@@ -129,20 +134,32 @@ private fun FiltroMisiones.texto() = when (this) {
     FiltroMisiones.TODAS -> "Todas"
 }
 
-/** Tarjeta de la lista: ícono, título pixel, descripción, "+XP" y el progreso "0/3" abajo a la derecha. */
+/**
+ * Tarjeta de la lista: ícono, título pixel, descripción, "+XP" y el progreso "0/3" abajo a la derecha.
+ * Cumplida: verde con borde oscuro y la palomita a la derecha (pestaña "Completadas" del diseño).
+ */
 @Composable
 fun TarjetaMision(item: MisionConProgreso, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val forma = RoundedCornerShape(16.dp)
     val mision = item.mision
+    val cumplida = item.estado == EstadoMision.COMPLETADA
     Box(
         modifier = modifier
             .fillMaxWidth()
             .height(86.dp)
             .clip(forma)
-            .background(MisionTarjetaFondo)
-            .border(1.dp, MisionTarjetaBorde, forma)
+            .background(if (cumplida) MisionCumplidaFondo else MisionTarjetaFondo)
+            .border(if (cumplida) 3.dp else 1.dp, if (cumplida) MisionCumplidaBorde else MisionTarjetaBorde, forma)
             .clickable(role = Role.Button, onClick = onClick),
     ) {
+        if (cumplida) {
+            Image(
+                bitmap = ImageBitmap.imageResource(R.drawable.ic_mision_cumplida),
+                contentDescription = "Cumplida",
+                filterQuality = FilterQuality.None,
+                modifier = Modifier.align(Alignment.CenterEnd).padding(end = 35.dp, bottom = 8.dp).size(53.dp),
+            )
+        }
         Row(
             modifier = Modifier.fillMaxHeight().padding(start = 16.dp, end = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -178,7 +195,7 @@ fun TarjetaMision(item: MisionConProgreso, onClick: () -> Unit, modifier: Modifi
                 Spacer(Modifier.height(5.dp))
                 Text(
                     buildAnnotatedString {
-                        withStyle(SpanStyle(color = MisionXpMas)) { append("+") }
+                        withStyle(SpanStyle(color = if (cumplida) MisionCumplidaMas else MisionXpMas)) { append("+") }
                         append("${item.aceptada?.xp ?: mision.xp} XP")
                     },
                     color = Color.White,
@@ -190,10 +207,48 @@ fun TarjetaMision(item: MisionConProgreso, onClick: () -> Unit, modifier: Modifi
         }
         Text(
             item.aceptada?.textoProgreso ?: "0/${mision.meta}",
-            color = MisionProgreso,
+            color = if (cumplida) MisionCumplidaProgreso else MisionProgreso,
             fontFamily = PlusJakartaSans,
             fontSize = 16.sp,
             modifier = Modifier.align(Alignment.BottomEnd).padding(end = 27.dp, bottom = 8.dp),
+        )
+    }
+}
+
+/** "¡Reclamar recompensa!" (pestaña Completadas): verde, texto grande y la gema a la derecha. */
+@Composable
+fun BotonReclamarRecompensa(onClick: () -> Unit, cargando: Boolean, modifier: Modifier = Modifier) {
+    val forma = RoundedCornerShape(20.dp)
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(60.dp)
+            .clip(forma)
+            .background(BotonGuardar)
+            .clickable(enabled = !cargando, role = Role.Button, onClick = onClick)
+            .padding(start = 11.dp, end = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        if (cargando) {
+            Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(modifier = Modifier.size(26.dp), strokeWidth = 3.dp, color = Color.White)
+            }
+        } else {
+            Text(
+                "¡Reclamar recompensa!",
+                color = Color.White,
+                fontFamily = PlusJakartaSans,
+                fontWeight = FontWeight.Bold,
+                fontSize = 24.sp,
+                maxLines = 1,
+            )
+        }
+        Image(
+            bitmap = ImageBitmap.imageResource(R.drawable.ic_recompensa_gema),
+            contentDescription = null,
+            filterQuality = FilterQuality.None,
+            modifier = Modifier.size(width = 36.dp, height = 40.dp),
         )
     }
 }
