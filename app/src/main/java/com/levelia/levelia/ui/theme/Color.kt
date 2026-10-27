@@ -84,8 +84,6 @@ val XpRellenoArriba = Color(0xFF2ED48A)
 val XpRellenoMedio = Color(0xFF02B266)
 val XpRellenoAbajo = Color(0xFF02975E)
 
-val RequisitoCumplido = Color(0xFF038456)
-val RequisitoFallido = Color(0xFFCB195D)
 
 // ---------------------------------------------------------------------------------------------
 // Módulo Misiones (valores medidos del diseño del equipo, pantalla "Misiones")
@@ -107,3 +105,9 @@ val DificultadUnica = Color(0xFFEA48F8)
 // Círculo sin marcar de "Ajustes de misión" (el marcado usa ic_dialog_ok)
 val RadioDificultadAro = Color(0xFF645980)
 val RadioDificultadVacio = Color(0xFFD9D9D9)
+
+// Pestaña "Completadas" (tarjetas cumplidas y "¡Reclamar recompensa!")
+val MisionCumplidaFondo = Color(0xFF4DD585)
+val MisionCumplidaBorde = Color(0xFF005D19)
+val MisionCumplidaMas = Color(0xFF008856)
+val MisionCumplidaProgreso = Color(0xFF000000)

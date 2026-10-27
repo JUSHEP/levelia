@@ -2,11 +2,13 @@ package com.levelia.levelia.data.repository
 
 import com.levelia.levelia.data.remote.MisionDto
 import com.levelia.levelia.data.remote.MisionUsuarioDto
+import com.levelia.levelia.data.remote.PreferenciaDto
 import com.levelia.levelia.data.remote.RecompensaDto
 import com.levelia.levelia.data.remote.SupabaseConfig
 import com.levelia.levelia.domain.models.AuthResult
 import com.levelia.levelia.domain.models.Dificultad
 import com.levelia.levelia.domain.models.Mision
+import com.levelia.levelia.domain.models.MensajesMision
 import com.levelia.levelia.domain.models.MisionAceptada
 import com.levelia.levelia.domain.models.MisionConProgreso
 import com.levelia.levelia.domain.models.Recompensa
@@ -46,8 +48,26 @@ class MisionesRepository @Inject constructor(
             .map(MisionUsuarioDto::aMisionAceptada)
             .groupBy(MisionAceptada::misionId)
             .mapValues { it.value.first() }
-        misiones.map { MisionConProgreso(it, ultimaAceptada[it.id]) }
+        // La dificultad guardada en "Ajustes de misión" (sin aceptar) cambia las veces y XP que se muestran
+        val guardadas = supabase.from("misiones_preferencias")
+            .select()
+            .decodeList<PreferenciaDto>()
+            .associate { it.misionId to Dificultad.valueOf(it.dificultad) }
+        misiones.map { MisionConProgreso(it.ajustada(guardadas[it.id]), ultimaAceptada[it.id]) }
     }
+
+    /** "Guardar cambios" de Ajustes de misión: guarda la dificultad en la base SIN aceptar la misión. */
+    suspend fun ajustarDificultad(misionId: Long, dificultad: Dificultad): AuthResult<Unit> =
+        intentar("ajustarDificultad") {
+            supabase.postgrest.rpc(
+                "ajustar_dificultad",
+                buildJsonObject {
+                    put("p_mision_id", misionId)
+                    put("p_dificultad", dificultad.name)
+                },
+            )
+            Unit
+        }
 
     /** "Crea tu propia misión". [fechaLimite] solo se usa (y es obligatoria) en UNICA. */
     suspend fun crearMision(
@@ -67,7 +87,7 @@ class MisionesRepository @Inject constructor(
         ).decodeAs<MisionDto>().aMision()
     }
 
-    /** "Aceptar misión". [dificultad] null = la de la misión; otra = la elegida en "Ajustar dificultad". */
+    /** "Aceptar misión". [dificultad] null = la guardada en "Ajustes de misión" o, si no hay, la de la misión. */
     suspend fun aceptarMision(misionId: Long, dificultad: Dificultad? = null): AuthResult<MisionAceptada> =
         intentar("aceptarMision") {
             supabase.postgrest.rpc(
@@ -122,7 +142,7 @@ class MisionesRepository @Inject constructor(
         const val FECHA_REQUERIDA = "¡Tienes que elegir una fecha límite!"
         const val FECHA_PASADA = "La fecha límite no puede ser anterior a hoy."
         const val YA_REGISTRADO_HOY = "Ya registraste tu progreso hoy. ¡Vuelve mañana!"
-        const val YA_ACEPTADA = "Ya aceptaste esta misión."
+        const val YA_ACEPTADA = MensajesMision.YA_ACEPTADA
         const val TITULO_MAX = 40
         const val TITULO_LARGO = "El nombre puede tener máximo $TITULO_MAX caracteres."
 
@@ -136,9 +156,9 @@ class MisionesRepository @Inject constructor(
             "MISION_YA_ACTIVA" to YA_ACEPTADA,
             // Doble toque o dos teléfonos a la vez: lo frena el índice único de la tabla
             "misiones_usuario_una_activa" to YA_ACEPTADA,
-            "RECOMPENSA_PENDIENTE" to "Primero reclama la recompensa de esta misión.",
-            "MISION_YA_HECHA" to "Esta misión es única y ya la aceptaste.",
-            "MISION_EN_CURSO" to "Ya hiciste esta misión. Podrás repetirla cuando termine su plazo.",
+            "RECOMPENSA_PENDIENTE" to MensajesMision.RECOMPENSA_PENDIENTE,
+            "MISION_YA_HECHA" to MensajesMision.UNICA_HECHA,
+            "MISION_EN_CURSO" to MensajesMision.EN_CURSO,
             "MISION_NO_EXISTE" to "Esta misión ya no existe.",
             "MISION_TERMINADA" to "Esta misión ya terminó.",
             "YA_REGISTRADO_HOY" to YA_REGISTRADO_HOY,

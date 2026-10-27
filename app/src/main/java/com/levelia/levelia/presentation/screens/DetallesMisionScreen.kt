@@ -161,6 +161,16 @@ fun DetallesMisionScreen(
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
+        } else if (item.motivoNoAceptable(hoy) != null) {
+            // Cumplida sin reclamar, dentro de su semana o UNICA ya hecha: el servidor la rechazaría
+            Text(
+                item.motivoNoAceptable(hoy)!!,
+                color = Color.White,
+                fontFamily = PlusJakartaSans,
+                fontSize = 15.sp,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
         } else {
             BotonPerfil(texto = "Aceptar misión", onClick = onAceptar, color = BotonGuardar, cargando = enviando)
             if (puedeAjustar) {

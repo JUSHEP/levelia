@@ -1,6 +1,6 @@
 # Levelia — documentación del proyecto
 
-> Estado al **2026-10-21**. Resume qué hace la app, cómo está construida, qué se probó y qué falta.
+> Estado al **2026-10-27**. Resume qué hace la app, cómo está construida, qué se probó y qué falta.
 > Documentos relacionados: `CONTEXTO_LEVELIA.md` (branding y medidas exactas), `QA_REPORTE.md` (pruebas y
 > hallazgos), `PROMPT_SUPABASE_LEVELIA.md` (especificación original de la base), `../CLAUDE.md` (reglas
 > para trabajar en el código).
@@ -16,7 +16,7 @@ gym, ir a clases, estudiar…), registra su progreso, gana **XP** y **sube de ni
 |---|---|
 | 1. Autenticación (registro con código, login, recuperar contraseña) | ✅ Terminado y probado en el emulador |
 | 2. Perfil (nombre, avatar, contraseña, eliminar cuenta, nivel/XP) | ✅ Terminado y probado en el emulador |
-| 3. Misiones | ✅ Backend completo y probado · 🟡 Frontend: solo la pantalla de lista |
+| 3. Misiones | ✅ Completo y probado de punta a punta (crear, ajustar, aceptar, progreso, reclamar, subir de nivel) |
 | Logros, Personalización, Home real | ⏳ Pendientes (la barra inferior ya tiene sus pestañas) |
 
 ---
@@ -184,8 +184,13 @@ de la tabla `progreso`; la meta del nivel sale de la curva de niveles.
 - La XP se suma al pulsar **"¡Reclamar recompensa!"** (todas las cumplidas de una vez), no al cumplir.
 - Una misión se puede repetir cuando terminó el plazo de la anterior y su XP ya se reclamó. La Única,
   una sola vez. (Esto evita ganar XP infinita repitiendo la misma misión el mismo día.)
-- "Ajustar dificultad" cambia veces y XP según la tabla (no se puede pasar a Única, que necesita fecha).
+- "Ajustar dificultad" → "Guardar cambios" guarda la dificultad **en la base sin aceptar** la misión
+  (tabla `misiones_preferencias`) y vuelve a la lista con las nuevas veces y XP. Al aceptar se usa la
+  guardada. No se puede ajustar una misión en curso ni una Única (necesita fecha).
 - Predefinidas (las 4 del diseño) visibles para todos; las creadas por un usuario solo las ve él.
+- Pestañas: **Activas** = aceptadas y en curso (vacía hasta aceptar una) · **Completadas** = cumplidas,
+  reclamadas o no (ahí sale "¡Reclamar recompensa!" si falta XP por sumar) · **Todas** = el catálogo
+  completo, primero las que aún no están cumplidas.
 
 **Flujo previsto (diseño del equipo):**
 
@@ -208,7 +213,9 @@ flowchart LR
 | Repositorio | `MisionesRepository.kt` | ✅ |
 | ViewModel (lista, aceptar, registrar, reclamar, crear con validaciones) | `MisionesViewModel.kt` | ✅ 17 pruebas |
 | Pantalla "Misiones" (pestañas, tarjetas, botón crear) | `MisionesScreen.kt`, `MisionesUi.kt` | ✅ Revisada en el emulador |
-| Detalles de misión, Ajustar dificultad, Crea tu propia misión, tarjetas verdes de cumplidas y botón Reclamar | — | ⏳ **Para el equipo** (ver §8) |
+| Crea tu propia misión · Detalles de misión · Ajustes de misión | `CrearMisionScreen`, `DetallesMisionScreen`, `AjustarDificultadScreen` (equipo) | ✅ |
+| Ajustes guardados sin aceptar | tabla `misiones_preferencias` + `ajustar_dificultad()` | ✅ Migración `ajustes_dificultad_preferencias_v4` |
+| Tarjetas verdes de cumplidas, "¡Reclamar recompensa!" y aviso de nivel | `MisionesUi.kt`, `MisionesScreen.kt` | ✅ Probado: 2 misiones Fácil → +150 XP → nivel 2 (50/283) |
 
 ### 4.4 Niveles y XP
 
@@ -236,13 +243,15 @@ Proyecto `ikpggszhejomdpgtujfc`. Todas las tablas tienen **RLS** (cada usuario s
 | `historial_nombres` | cada cambio de nombre | Solo leer lo suyo |
 | `misiones` | catálogo: predefinidas (`user_id` null) y propias | Solo leer |
 | `misiones_usuario` | misiones aceptadas: dificultad, meta, progreso, fecha límite, estado, recompensa reclamada | Solo leer |
+| `misiones_preferencias` | dificultad guardada en "Ajustes de misión" por cada usuario (sin aceptar) | Solo leer |
 
 | Función (RPC) | Qué hace |
 |---|---|
 | `nombre_disponible(nombre)` | ¿El nombre está libre? (sin sesión, para el registro) |
 | `eliminar_mi_cuenta()` | Borra la cuenta de quien la llama y todo lo suyo |
 | `crear_mision(titulo, descripcion, dificultad, fecha)` | "Crea tu propia misión" |
-| `aceptar_mision(id, dificultad?)` | "Aceptar misión" (y "Ajustar dificultad") |
+| `ajustar_dificultad(id, dificultad)` | "Guardar cambios" de Ajustes de misión (sin aceptar) |
+| `aceptar_mision(id, dificultad?)` | "Aceptar misión" (usa la dificultad guardada, si hay) |
 | `registrar_progreso(id)` | "Registrar progreso +" (cumple o pierde según la fecha) |
 | `vencer_mis_misiones()` | Marca perdidas las vencidas (la app la llama antes de leer) |
 | `reclamar_recompensas()` | Suma la XP y sube de nivel |
@@ -265,7 +274,7 @@ llamarlas: es intencional, es la API de la app.
 
 | Tipo | Dónde | Resultado |
 |---|---|---|
-| Unitarias (ViewModels con repositorio simulado, reglas, DTOs, errores) | `app/src/test/` | **105 pruebas, 0 fallos** |
+| Unitarias (ViewModels con repositorio simulado, reglas, DTOs, errores) | `app/src/test/` | **109 pruebas, 0 fallos** |
 | Reglas y seguridad de la base (RLS, funciones) | `supabase/pruebas.sql`, `supabase/pruebas_misiones.sql` | `PRUEBAS_OK` (se revierten solas) |
 | Visuales contra Figma | Emulador Pixel 6 (412 dp), `REVISION_EMULADOR.md`, capturas en `capturas/` | Login, registro, recuperar, Perfil y Misiones revisados |
 | Compilación en la nube | GitHub Actions `build-apk.yml` en cada push | Publica el APK `levelia-apk` |
@@ -294,7 +303,7 @@ $env:JAVA_HOME = "C:\Program Files\Java\jdk-21.0.12.1"
 
 ---
 
-## 8. Siguientes pasos para el frontend de Misiones
+## 8. Cómo está conectado el frontend de Misiones (referencia)
 
 Todo lo que necesitan las pantallas ya existe en `MisionesViewModel` (probado). En `NavGraph`, la pantalla
 "Misiones" tiene dos lambdas vacías marcadas como pendientes:
@@ -338,7 +347,7 @@ teléfono (el login solo recuerda el correo).
 **¿Cómo se evita hacer trampa con la XP?** Un registro por día, plazo de 7 días, la XP solo se suma una
 vez por misión cumplida y no se puede repetir una misión dentro de su plazo. Todo lo valida el servidor.
 
-**¿Cómo se prueba?** 105 pruebas unitarias (lógica sin emulador, con datos simulados), pruebas SQL contra
+**¿Cómo se prueba?** 109 pruebas unitarias (lógica sin emulador, con datos simulados), pruebas SQL contra
 la base real que se revierten solas, y revisión visual en el emulador contra las capturas de Figma.
 
 **¿Qué pasa sin internet?** La app muestra la pantalla "Sin conexión" encima de todo hasta que vuelva.

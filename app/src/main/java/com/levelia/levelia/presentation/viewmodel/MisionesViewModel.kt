@@ -88,6 +88,13 @@ class MisionesViewModel @Inject constructor(
      * "Aceptar misión" (Detalle). [dificultad] null = la de la misión; si no, la elegida en "Ajustar
      * dificultad". [onAceptada] se llama en el hilo principal (para pasar al detalle con "Registrar progreso").
      */
+    /**
+     * "Guardar cambios" de Ajustes de misión: guarda la dificultad en la base sin aceptar la misión.
+     * [onGuardada]: volver a la lista, que se vuelve a leer con las veces y XP nuevas.
+     */
+    fun ajustarDificultad(misionId: Long, dificultad: Dificultad, onGuardada: () -> Unit = {}) =
+        enviar(accion = { repo.ajustarDificultad(misionId, dificultad) }, alTerminar = { onGuardada() })
+
     fun aceptar(misionId: Long, dificultad: Dificultad? = null, onAceptada: () -> Unit = {}) =
         enviar(
             accion = { repo.aceptarMision(misionId, dificultad) },

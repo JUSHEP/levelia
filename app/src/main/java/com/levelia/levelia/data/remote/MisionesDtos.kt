@@ -69,6 +69,15 @@ data class MisionUsuarioDto(
     )
 }
 
+/** Fila de `misiones_preferencias`: la dificultad guardada en "Ajustes de misión" (sin aceptar). */
+@Serializable
+data class PreferenciaDto(
+    @SerialName("user_id") val userId: String,
+    @SerialName("mision_id") val misionId: Long,
+    val dificultad: String,
+    @SerialName("updated_at") val updatedAt: String? = null,
+)
+
 /** Respuesta de la función `reclamar_recompensas()`. */
 @Serializable
 data class RecompensaDto(

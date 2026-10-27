@@ -53,32 +53,47 @@ class MisionesViewModelTest {
     // ============================== Lista ==============================
 
     @Test
-    fun `cargar trae las misiones pendientes de aceptar`() = runTest {
+    fun `cargar trae las misiones y activas queda vacia hasta aceptar una`() = runTest {
         val vm = vm()
         vm.cargar()
         advanceUntilIdle()
         val estado = vm.estado.value
-        assertEquals(2, estado.visibles.size)
-        assertTrue(estado.visibles.all { it.sePuedeAceptar(estado.hoy) })
+        assertEquals(2, estado.misiones.size)
+        assertTrue(estado.misiones.all { it.sePuedeAceptar(estado.hoy) })
+        assertTrue(estado.visibles.isEmpty()) // pestaña Activas: ninguna aceptada todavía
         assertFalse(estado.hayRecompensas)
         assertFalse(estado.cargando)
     }
 
     @Test
-    fun `completadas solo muestra las cumplidas por reclamar`() = runTest {
+    fun `cada pestana muestra lo suyo y todas pone primero las no cumplidas`() = runTest {
+        val enfoque = gym.copy(id = 3, titulo = "Modo enfoque")
+        val sigueme = gym.copy(id = 4, titulo = "Sígueme y te sigo")
+        val perdida = gym.copy(id = 5, titulo = "Perdida")
         coEvery { repo.obtenerMisiones() } returns AuthResult.Success(
-            listOf(MisionConProgreso(gym, aceptada(EstadoMision.COMPLETADA, progreso = 3)), MisionConProgreso(clases, null)),
+            listOf(
+                MisionConProgreso(gym, aceptada(EstadoMision.COMPLETADA, progreso = 3)), // por reclamar
+                MisionConProgreso(clases, null), // sin aceptar
+                MisionConProgreso(enfoque, aceptada(EstadoMision.ACTIVA, progreso = 1)), // en curso
+                MisionConProgreso(sigueme, aceptada(EstadoMision.COMPLETADA, reclamada = true, progreso = 3)), // ya reclamada
+                MisionConProgreso(perdida, aceptada(EstadoMision.PERDIDA)),
+            ),
         )
         val vm = vm()
         vm.cargar()
         advanceUntilIdle()
-        vm.onFiltro(FiltroMisiones.COMPLETADAS)
-        assertEquals(listOf(gym), vm.estado.value.visibles.map { it.mision })
-        assertTrue(vm.estado.value.hayRecompensas)
+
         vm.onFiltro(FiltroMisiones.ACTIVAS)
-        assertEquals(listOf(clases), vm.estado.value.visibles.map { it.mision })
+        assertEquals(listOf(enfoque), vm.estado.value.visibles.map { it.mision })
+
+        // Completadas: las cumplidas, reclamadas o no (el botón Reclamar sale si falta alguna)
+        vm.onFiltro(FiltroMisiones.COMPLETADAS)
+        assertEquals(listOf(gym, sigueme), vm.estado.value.visibles.map { it.mision })
+        assertTrue(vm.estado.value.hayRecompensas)
+
+        // Todas: el catálogo completo, primero las que aún no están cumplidas (en su orden original)
         vm.onFiltro(FiltroMisiones.TODAS)
-        assertEquals(2, vm.estado.value.visibles.size)
+        assertEquals(listOf(clases, enfoque, perdida, gym, sigueme), vm.estado.value.visibles.map { it.mision })
     }
 
     @Test
@@ -96,6 +111,60 @@ class MisionesViewModelTest {
         val unica = gym.copy(dificultad = Dificultad.UNICA, fechaLimite = LocalDate.of(2026, 12, 1))
         assertTrue(MisionConProgreso(unica, null).sePuedeAceptar(pasadoElPlazo))
         assertFalse(MisionConProgreso(unica, aceptada(EstadoMision.COMPLETADA, reclamada = true)).sePuedeAceptar(pasadoElPlazo))
+    }
+
+    @Test
+    fun `guardar dificultad no acepta y vuelve a la lista`() = runTest {
+        coEvery { repo.ajustarDificultad(1, Dificultad.DIFICIL) } returns AuthResult.Success(Unit)
+        val vm = vm()
+        var volvio = false
+        vm.ajustarDificultad(1, Dificultad.DIFICIL) { volvio = true }
+        advanceUntilIdle()
+        assertTrue(volvio)
+        coVerify { repo.ajustarDificultad(1, Dificultad.DIFICIL) }
+        coVerify(exactly = 0) { repo.aceptarMision(any(), any()) }
+        coVerify { repo.obtenerMisiones() } // la lista se relee con las veces y XP nuevas
+    }
+
+    @Test
+    fun `guardar dificultad con error se queda y lo muestra`() = runTest {
+        coEvery { repo.ajustarDificultad(any(), any()) } returns AuthResult.Error("Ya aceptaste esta misión.")
+        val vm = vm()
+        var volvio = false
+        vm.ajustarDificultad(1, Dificultad.FACIL) { volvio = true }
+        advanceUntilIdle()
+        assertFalse(volvio)
+        assertEquals("Ya aceptaste esta misión.", vm.estado.value.error)
+    }
+
+    @Test
+    fun `la dificultad guardada cambia veces y xp de la mision`() {
+        val ajustada = gym.ajustada(Dificultad.DIFICIL)
+        assertEquals(Dificultad.DIFICIL, ajustada.dificultad)
+        assertEquals(5, ajustada.meta)
+        assertEquals(300, ajustada.xp)
+        // Sin guardar, o guardada la misma: conserva sus valores originales (A clases es MEDIA 2/100)
+        assertEquals(clases, clases.ajustada(null))
+        assertEquals(clases, clases.ajustada(Dificultad.MEDIA))
+    }
+
+    @Test
+    fun `detalles dice por que no se puede aceptar`() {
+        val dentro = LocalDate.of(2026, 10, 27)
+        val despues = LocalDate.of(2026, 10, 28)
+        assertNull(MisionConProgreso(gym, null).motivoNoAceptable(dentro))
+        assertEquals("Ya aceptaste esta misión.", MisionConProgreso(gym, aceptada(EstadoMision.ACTIVA)).motivoNoAceptable(dentro))
+        assertEquals(
+            "Primero reclama la recompensa de esta misión.",
+            MisionConProgreso(gym, aceptada(EstadoMision.COMPLETADA)).motivoNoAceptable(despues),
+        )
+        assertEquals(
+            "Ya hiciste esta misión. Podrás repetirla cuando termine su plazo.",
+            MisionConProgreso(gym, aceptada(EstadoMision.COMPLETADA, reclamada = true)).motivoNoAceptable(dentro),
+        )
+        assertNull(MisionConProgreso(gym, aceptada(EstadoMision.COMPLETADA, reclamada = true)).motivoNoAceptable(despues))
+        val unica = gym.copy(dificultad = Dificultad.UNICA, fechaLimite = LocalDate.of(2026, 12, 1))
+        assertEquals("Esta misión es única y ya la aceptaste.", MisionConProgreso(unica, aceptada(EstadoMision.PERDIDA)).motivoNoAceptable(despues))
     }
 
     @Test

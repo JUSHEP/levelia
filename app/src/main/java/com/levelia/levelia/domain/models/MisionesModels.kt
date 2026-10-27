@@ -38,7 +38,15 @@ data class Mision(
     val fechaLimite: LocalDate?,
     /** true = la creó el usuario ("Crea tu propia misión"). */
     val propia: Boolean,
-)
+) {
+    /**
+     * La misión con la dificultad que el usuario guardó en "Ajustes de misión": veces y XP de la tabla de
+     * dificultades. null o la misma de la misión = sin cambios (conserva sus veces y XP originales).
+     */
+    fun ajustada(guardada: Dificultad?): Mision =
+        if (guardada == null || guardada == dificultad) this
+        else copy(dificultad = guardada, meta = guardada.veces, xp = guardada.xp)
+}
 
 /** Una misión aceptada (tabla `misiones_usuario`), con su progreso. */
 data class MisionAceptada(
@@ -80,8 +88,28 @@ data class MisionConProgreso(val mision: Mision, val aceptada: MisionAceptada?) 
         return anterior.estado != EstadoMision.ACTIVA && !porReclamar && hoy.isAfter(anterior.fechaLimite)
     }
 
+    /**
+     * Por qué no se puede aceptar (null = sí se puede). Mismos textos que traduce MisionesRepository
+     * cuando el servidor la rechaza, para que "Detalles de misión" no muestre un botón que va a fallar.
+     */
+    fun motivoNoAceptable(hoy: LocalDate): String? = when {
+        sePuedeAceptar(hoy) -> null
+        aceptada?.estado == EstadoMision.ACTIVA -> MensajesMision.YA_ACEPTADA
+        porReclamar -> MensajesMision.RECOMPENSA_PENDIENTE
+        mision.dificultad == Dificultad.UNICA -> MensajesMision.UNICA_HECHA
+        else -> MensajesMision.EN_CURSO
+    }
+
     /** Cumplida y su XP todavía no se sumó (cuenta para "¡Reclamar recompensa!"). */
     val porReclamar: Boolean get() = aceptada?.estado == EstadoMision.COMPLETADA && !aceptada.recompensaReclamada
+}
+
+/** Textos de las reglas de aceptar (los usan la pantalla y MisionesRepository). */
+object MensajesMision {
+    const val YA_ACEPTADA = "Ya aceptaste esta misión."
+    const val RECOMPENSA_PENDIENTE = "Primero reclama la recompensa de esta misión."
+    const val UNICA_HECHA = "Esta misión es única y ya la aceptaste."
+    const val EN_CURSO = "Ya hiciste esta misión. Podrás repetirla cuando termine su plazo."
 }
 
 /** Pestañas de la pantalla Misiones. */
@@ -104,14 +132,14 @@ data class MisionesUiState(
     val hoy: LocalDate = hoyLevelia(),
 ) {
     /**
-     * Completadas = cumplidas con la XP por reclamar. Al reclamarlas vuelven a Activas (se pueden aceptar
-     * otra vez cuando termine su plazo, igual que las perdidas).
+     * Activas = aceptadas y en curso (vacía hasta aceptar una). Completadas = cumplidas, con la XP
+     * reclamada o no. Todas = el catálogo completo, primero las que aún no están cumplidas.
      */
     val visibles: List<MisionConProgreso>
         get() = when (filtro) {
-            FiltroMisiones.ACTIVAS -> misiones.filterNot { it.porReclamar }
-            FiltroMisiones.COMPLETADAS -> misiones.filter { it.porReclamar }
-            FiltroMisiones.TODAS -> misiones
+            FiltroMisiones.ACTIVAS -> misiones.filter { it.estado == EstadoMision.ACTIVA }
+            FiltroMisiones.COMPLETADAS -> misiones.filter { it.estado == EstadoMision.COMPLETADA }
+            FiltroMisiones.TODAS -> misiones.sortedBy { it.estado == EstadoMision.COMPLETADA }
         }
 
     /** Muestra el botón "¡Reclamar recompensa!". */

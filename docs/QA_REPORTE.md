@@ -77,3 +77,17 @@ Pendientes (requieren reingeniería o decisión, no se corrigen aquí):
 - `hoy()` usa la hora de Colombia fija y no se puede simular otro día en las pruebas SQL (el "mañana sí puede registrar" se prueba en Kotlin).
 - Las predefinidas del diseño (A clases 2/100, Modo enfoque 2/75, Sígueme 3/100) no coinciden con la tabla de dificultades (1/75, 3/150, 5/300): confirmar con el equipo.
 - Lint: el único error es `local.properties` (archivo local de Android Studio, no va en git); los avisos `UseKtx` de `AuthRepository` son anteriores.
+
+## Módulo Misiones — cierre y prueba de punta a punta (2026-10-27)
+
+**Resultado: 109 pruebas unitarias, 0 fallos · `pruebas_misiones.sql` → `PRUEBAS_OK` contra la base real.**
+
+| # | Severidad | Hallazgo | Corrección |
+|---|---|---|---|
+| M11 | **Alta** | Ninguna pantalla llamaba a "¡Reclamar recompensa!": la XP nunca llegaba al nivel | Botón en "Completadas" + aviso "Ganaste +N XP. ¡Subiste al nivel N!" |
+| M12 | Media | "Detalles de misión" mostraba "Aceptar" en misiones que el servidor rechaza (cumplida sin reclamar, dentro de su semana, Única ya hecha) | `MisionConProgreso.motivoNoAceptable(hoy)`: se muestra el motivo en lugar del botón |
+| M13 | Media | "Ajustes de misión" no guardaba la dificultad hasta aceptar | Tabla `misiones_preferencias` + `ajustar_dificultad()`; "Guardar cambios" vuelve a la lista con veces y XP nuevas |
+
+Prueba en el emulador (cuenta del equipo): ajustar Ir al gym y A clases a Fácil → aceptar → aumentar progreso (1/1, vuelve a la lista) → pestaña Completadas (tarjetas verdes) → Reclamar → "Ganaste +150 XP. ¡Subiste al nivel 2!" → Perfil: **Nvl. 2 · 50 / 283 XP** (igual en la base).
+
+Pendientes: el aviso de recompensa usa textos provisionales (el diseño no lo trae); íconos `ic_mision_cumplida` e `ic_recompensa_gema` recortados del diseño (reemplazar por exportación de Figma con el mismo nombre); el PR #7 (`misiones-completo`) choca con `main` y quedó superado por el commit de Joshep.
