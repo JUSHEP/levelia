@@ -50,6 +50,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.levelia.levelia.R
@@ -102,27 +103,40 @@ fun IconoMision.recurso(): Int = when (this) {
 
 /** "Activas · Completadas · Todas": tres partes iguales; la elegida es una píldora verde. */
 @Composable
-fun PestanasMisiones(seleccion: FiltroMisiones, onSeleccion: (FiltroMisiones) -> Unit, modifier: Modifier = Modifier) {
+fun PestanasMisiones(seleccion: FiltroMisiones, onSeleccion: (FiltroMisiones) -> Unit, modifier: Modifier = Modifier) =
+    PestanasPildora(FiltroMisiones.entries, seleccion, { it.texto() }, onSeleccion, modifier)
+
+/** Pestañas en partes iguales con la elegida como píldora verde (Misiones y Logros). */
+@Composable
+fun <T> PestanasPildora(
+    opciones: List<T>,
+    seleccion: T,
+    texto: (T) -> String,
+    onSeleccion: (T) -> Unit,
+    modifier: Modifier = Modifier,
+    alto: Dp = 42.dp,
+    tamanoTexto: TextUnit = 16.sp,
+) {
     val forma = RoundedCornerShape(50)
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .height(42.dp)
+            .height(alto)
             .clip(forma)
             .background(MisionPestanasFondo),
     ) {
-        FiltroMisiones.entries.forEach { filtro ->
-            val elegida = filtro == seleccion
+        opciones.forEach { opcion ->
+            val elegida = opcion == seleccion
             Box(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxHeight()
                     .clip(forma)
                     .background(if (elegida) MisionPestanaActiva else Color.Transparent)
-                    .clickable(role = Role.Tab) { onSeleccion(filtro) },
+                    .clickable(role = Role.Tab) { onSeleccion(opcion) },
                 contentAlignment = Alignment.Center,
             ) {
-                Text(filtro.texto(), color = Color.White, fontFamily = PlusJakartaSans, fontSize = 16.sp, maxLines = 1)
+                Text(texto(opcion), color = Color.White, fontFamily = PlusJakartaSans, fontSize = tamanoTexto, maxLines = 1)
             }
         }
     }
@@ -161,7 +175,8 @@ fun TarjetaMision(item: MisionConProgreso, onClick: () -> Unit, modifier: Modifi
             )
         }
         Row(
-            modifier = Modifier.fillMaxHeight().padding(start = 16.dp, end = 12.dp),
+            // Cumplida: el texto se corta antes de la palomita (35 + 53 + 8) en vez de quedar debajo de ella
+            modifier = Modifier.fillMaxHeight().padding(start = 16.dp, end = if (cumplida) 96.dp else 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Image(

@@ -17,7 +17,8 @@ gym, ir a clases, estudiar…), registra su progreso, gana **XP** y **sube de ni
 | 1. Autenticación (registro con código, login, recuperar contraseña) | ✅ Terminado y probado en el emulador |
 | 2. Perfil (nombre, avatar, contraseña, eliminar cuenta, nivel/XP) | ✅ Terminado y probado en el emulador |
 | 3. Misiones | ✅ Completo y probado de punta a punta (crear, ajustar, aceptar, progreso, reclamar, subir de nivel) |
-| Logros, Personalización, Home real | ⏳ Pendientes (la barra inferior ya tiene sus pestañas) |
+| 4. Logros | ✅ Backend y pantallas (Logros, Detalles del logro, aviso de desbloqueo); medallas provisionales |
+| Personalización, Home real | ⏳ Pendientes (la barra inferior ya tiene sus pestañas) |
 
 ---
 
@@ -217,7 +218,36 @@ flowchart LR
 | Ajustes guardados sin aceptar | tabla `misiones_preferencias` + `ajustar_dificultad()` | ✅ Migración `ajustes_dificultad_preferencias_v4` |
 | Tarjetas verdes de cumplidas, "¡Reclamar recompensa!" y aviso de nivel | `MisionesUi.kt`, `MisionesScreen.kt` | ✅ Probado: 2 misiones Fácil → +150 XP → nivel 2 (50/283) |
 
-### 4.4 Niveles y XP
+### 4.4 Logros (módulo 4)
+
+Medallas en familias de 3 niveles (bronce, plata, oro) que **no dan XP: dan equipamiento** (casco, pechera,
+espada, botas) para el módulo Personalización.
+
+| Logro | Requisitos | Artículo |
+|---|---|---|
+| ¡Primeros pasos! | 1 misión cumplida | Pechera básica |
+| ¡Calentamiento! → ¡En forma! → ¡¡Unidad absoluta!! | 3 / 10 / 30 misiones físicas · racha 7 / 30 días · la anterior | Botas básicas · Pechera de plata · Pechera de oro |
+| Estudioso → ¡Pensador! → ¡¡Sabio!! | 3 / 10 / 30 misiones de estudio · racha 7 / 30 días · la anterior | Casco básico · de plata · de oro |
+| Aprendiz → ¡Junior! → ¡¡Senior!! | Nivel 5 / 10 / 25 · la anterior | Espada básica · de plata · de oro |
+
+- La categoría de una misión sale de su ícono (pesa = físico, cerebro = estudio, personas = social).
+- Una misión cuenta al cumplirla. La racha es la mayor cantidad de días seguidos con "Aumentar progreso"
+  (tabla `registros_progreso`).
+- El servidor desbloquea solo (al registrar progreso, al reclamar XP y al abrir Logros), guarda la fecha y
+  entrega el artículo en `inventario`. `mis_logros()` trae para cada logro el avance de sus requisitos, el
+  "Progreso general" y el "Avance para el siguiente nivel" (la siguiente medalla de su familia).
+- App: `LogrosRepository`, `LogrosViewModel` (`cargar`, `onFiltro`, `logro(id)`, `nuevos`, `cerrarNuevos`,
+  `limpiar`) y textos en `LogrosModels.kt` ("Completar 10 misiones físicas", "11 - sep - 2026 - 19:15").
+- Pantallas: `LogrosScreen` (pestañas Obtenidos / Todos, cuadrícula de 3) y `DetallesLogroScreen`
+  (desbloqueado: fecha y "Completado"; bloqueado: candado, familia/nivel, "Progreso general" y "Avance para el
+  siguiente nivel"). Componentes en `components/LogrosUi.kt`. `LogrosViewModel` se crea en `MainActivity`;
+  NavGraph lo relee al iniciar sesión, al registrar progreso y al reclamar XP, y muestra "¡Logro desbloqueado!"
+  encima de cualquier pantalla (textos provisionales, sin diseño).
+- Imágenes provisionales recortadas de los mockups: `logro_<id>.png`, `ic_logro_bloqueado.png`,
+  `ic_logro_calendario.png` (reemplazar con el mismo nombre). ¡¡Sabio!! usa una copia de ¡Pensador!; los recortes
+  de medallas que en el mockup salían bloqueadas quedaron apagados. Las imágenes de artículos siguen pendientes.
+
+### 4.5 Niveles y XP
 
 Del nivel *n* al *n+1* hacen falta `round(100 · n^1.5)` XP (curva exponencial, estilo RPG):
 

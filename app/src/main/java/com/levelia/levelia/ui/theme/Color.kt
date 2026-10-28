@@ -111,3 +111,22 @@ val MisionCumplidaFondo = Color(0xFF4DD585)
 val MisionCumplidaBorde = Color(0xFF005D19)
 val MisionCumplidaMas = Color(0xFF008856)
 val MisionCumplidaProgreso = Color(0xFF000000)
+
+// ---------------------------------------------------------------------------------------------
+// Módulo Logros (valores medidos del diseño del equipo, pantallas "Logros" y "Detalles del logro")
+// ---------------------------------------------------------------------------------------------
+
+val LogroTarjetaFondo = Color(0xFF3C1771)
+val LogroTarjetaBorde = Color(0xFF345796)
+val LogroBloqueadoFondo = Color(0xFF453A54) // tarjetas grises de la pestaña "Todos"
+val LogroBloqueadoBorde = Color(0xFF4B4663)
+val LogroBloqueadoTexto = Color(0xFF5D5670)
+val LogroPanelFondo = Color(0xFF170343) // "Descripción", "Requisitos", "Fecha de obtención"…
+val LogroPanelBorde = Color(0xFF285E9A)
+val LogroDesbloqueadoFondo = Color(0xFF018A69) // insignia "Desbloqueado"
+val LogroDesbloqueadoBorde = Color(0xFF14F9BC)
+val LogroBloqueadoInsigniaFondo = Color(0xFF34195D) // insignia "Bloqueado" y etiquetas "Físico", "Nivel 3"
+val LogroBloqueadoInsigniaBorde = Color(0xFF6F5593)
+val LogroRequisitoCumplido = Color(0xFF1FA58A) // "1/1"
+val LogroRequisitoPendiente = Color(0xFF9791A3) // "0/1"
+val LogroFecha = Color(0xFF9A8AB6)
