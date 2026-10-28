@@ -81,6 +81,10 @@ sealed class Destinations(val route: String) {
     data object AjustarDificultadScreen : Destinations("ajustar_dificultad/{misionId}") {
         fun conId(misionId: Long) = "ajustar_dificultad/$misionId"
     }
+    data object LogrosScreen : Destinations("logros")
+    data object DetallesLogroScreen : Destinations("detalles_logro/{logroId}") {
+        fun conId(logroId: String) = "detalles_logro/$logroId"
+    }
 }
 
 /**

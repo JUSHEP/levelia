@@ -137,6 +137,36 @@ create policy "misiones_usuario_select_propias"
   using (user_id = (select auth.uid()));
 
 -- -----------------------------------------------------------------------------
+-- 2a. registros_progreso: un "Aumentar progreso" por fila (historial por día para las rachas de Logros)
+-- -----------------------------------------------------------------------------
+create table if not exists public.registros_progreso (
+  id                bigint generated always as identity primary key,
+  user_id           uuid   not null references public.perfiles (id) on delete cascade,
+  mision_usuario_id bigint not null references public.misiones_usuario (id) on delete cascade,
+  fecha             date   not null,
+  unique (mision_usuario_id, fecha)
+);
+
+comment on table public.registros_progreso is
+  'Cada "Aumentar progreso" con su fecha. Lo escribe registrar_progreso(); lo usan las rachas de logros.sql.';
+
+create index if not exists registros_progreso_user_fecha on public.registros_progreso (user_id, fecha);
+
+alter table public.registros_progreso enable row level security;
+revoke all on public.registros_progreso from anon, authenticated;
+grant select on public.registros_progreso to authenticated;
+
+drop policy if exists "registros_progreso_select_propios" on public.registros_progreso;
+create policy "registros_progreso_select_propios"
+  on public.registros_progreso for select to authenticated
+  using (user_id = (select auth.uid()));
+
+-- Lo que ya estaba registrado antes de esta tabla (solo el último día de cada misión aceptada)
+insert into public.registros_progreso (user_id, mision_usuario_id, fecha)
+select user_id, id, ultimo_registro from public.misiones_usuario where ultimo_registro is not null
+on conflict (mision_usuario_id, fecha) do nothing;
+
+-- -----------------------------------------------------------------------------
 -- 2b. misiones_preferencias ("Ajustes de misión" guardado sin aceptar; versión 4, 2026-10-27)
 -- Las predefinidas son de todos: la dificultad elegida se guarda aparte, por usuario.
 -- -----------------------------------------------------------------------------
@@ -336,6 +366,14 @@ begin
          terminada_at    = case when progreso + 1 >= meta then now() end
    where id = p_id
   returning * into v_fila;
+
+  insert into public.registros_progreso (user_id, mision_usuario_id, fecha)
+  values (v_id, p_id, public.hoy())
+  on conflict (mision_usuario_id, fecha) do nothing;
+  -- Logros (supabase/logros.sql): si ya está instalado, se desbloquea lo que se haya cumplido
+  if to_regprocedure('public.evaluar_logros_de(uuid)') is not null then
+    perform public.evaluar_logros_de(v_id);
+  end if;
   return v_fila;
 end;
 $$;
@@ -381,6 +419,10 @@ begin
   if xp_ganada > 0 then
     update public.progreso p set nivel = reclamar_recompensas.nivel, xp = reclamar_recompensas.xp
      where p.user_id = v_id;
+    -- Subir de nivel puede desbloquear Aprendiz / ¡Junior! / ¡¡Senior!!
+    if to_regprocedure('public.evaluar_logros_de(uuid)') is not null then
+      perform public.evaluar_logros_de(v_id);
+    end if;
   end if;
 end;
 $$;

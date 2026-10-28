@@ -157,12 +157,12 @@ fun TarjetaProgreso(progreso: ProgresoData, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun BarraXp(fraccion: Float) {
+fun BarraXp(fraccion: Float, modifier: Modifier = Modifier, alto: Dp = 26.dp) {
     val forma = RoundedCornerShape(9.dp)
     Box(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
-            .height(26.dp)
+            .height(alto)
             .clip(forma)
             .background(XpPistaFondo)
             .border(2.dp, XpPistaBorde, forma)
