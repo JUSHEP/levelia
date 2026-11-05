@@ -48,7 +48,8 @@ begin
   exception when insufficient_privilege then null;
   end;
 
-  -- 3) Cumplir la primera misión (Fácil, 1 vez) desbloquea ¡Primeros pasos! y entrega la pechera
+  -- 3) Cumplir la primera misión (Fácil, 1 vez) desbloquea ¡Primeros pasos!, que vale 50 esmeraldas
+  --    (desde la versión 6 los logros ya no entregan piezas de equipamiento)
   mu := public.aceptar_mision(gym, 'FACIL');
   mu := public.registrar_progreso(mu.id);
   if mu.estado <> 'COMPLETADA' then raise exception 'FALLO: la misión de prueba no se cumplió'; end if;
@@ -56,8 +57,10 @@ begin
   if n <> 1 then raise exception 'FALLO: registrar_progreso no guardó el día en registros_progreso'; end if;
   select count(*) into n from public.logros_usuario where logro_id = 'PRIMEROS_PASOS';
   if n <> 1 then raise exception 'FALLO: cumplir la primera misión no desbloqueó ¡Primeros pasos!'; end if;
-  select count(*) into n from public.inventario where articulo_id = 'PECHERA_BASICA';
-  if n <> 1 then raise exception 'FALLO: ¡Primeros pasos! no entregó la pechera básica'; end if;
+  select count(*) into n from public.inventario;
+  if n <> 0 then raise exception 'FALLO: un logro entregó una pieza de equipamiento'; end if;
+  select esmeraldas into n from public.mis_logros() where id = 'PRIMEROS_PASOS';
+  if n <> 50 then raise exception 'FALLO: ¡Primeros pasos! debería valer 50 esmeraldas (%)', n; end if;
 
   select * into r from public.mis_logros() where id = 'CALENTAMIENTO';
   if r.progreso <> 33 or r.obtenido_at is not null or r.siguiente_id <> 'EN_FORMA' then
@@ -82,8 +85,7 @@ begin
   set local role authenticated;
   select * into r from public.mis_logros() where id = 'CALENTAMIENTO';
   if r.obtenido_at is null or r.progreso <> 100 then raise exception 'FALLO: 3 físicas no desbloquearon ¡Calentamiento!'; end if;
-  select count(*) into n from public.inventario where articulo_id = 'BOTAS_BASICAS';
-  if n <> 1 then raise exception 'FALLO: ¡Calentamiento! no entregó las botas'; end if;
+  if r.esmeraldas <> 50 then raise exception 'FALLO: ¡Calentamiento! debería valer 50 esmeraldas (%)', r.esmeraldas; end if;
 
   -- 6) Racha de 7 días: avanza ¡En forma! pero le faltan misiones (3/10, 7/7, 1/1 → 77 %)
   reset role;
@@ -102,8 +104,10 @@ begin
   set local role authenticated;
   select count(*) into n from public.mis_logros() where id in ('APRENDIZ', 'JUNIOR') and obtenido_at is not null;
   if n <> 2 then raise exception 'FALLO: nivel 10 no desbloqueó Aprendiz y ¡Junior! (%)', n; end if;
-  select count(*) into n from public.inventario where articulo_id in ('ESPADA_BASICA', 'ESPADA_PLATA');
-  if n <> 2 then raise exception 'FALLO: faltan las espadas de Aprendiz / ¡Junior!'; end if;
+  select sum(esmeraldas) into n from public.mis_logros() where id in ('APRENDIZ', 'JUNIOR');
+  if n <> 150 then raise exception 'FALLO: Aprendiz + ¡Junior! deberían valer 150 esmeraldas (%)', n; end if;
+  select count(*) into n from public.inventario;
+  if n <> 0 then raise exception 'FALLO: los logros de nivel entregaron piezas de equipamiento'; end if;
 
   -- 8) Reclamar recompensas evalúa sin abrir la pantalla: llegar al nivel 25 da ¡¡Senior!!
   reset role;

@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -25,6 +26,7 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
@@ -194,6 +196,8 @@ fun LeveliaScreen(
     margenHorizontal: Dp = 43.dp,
     /** Si no es null, la esquina superior izquierda muestra el botón de menú (hamburguesa) en vez de la flecha. */
     onMenu: (() -> Unit)? = null,
+    /** Lo que va en la misma fila de la flecha, a su derecha (título y contador de Personalización). */
+    barraSuperior: (@Composable RowScope.() -> Unit)? = null,
     /** Barra de navegación fija abajo (módulo Perfil / Home). */
     barraInferior: (@Composable BoxScope.() -> Unit)? = null,
     decoracion: @Composable BoxScope.() -> Unit = {},
@@ -260,6 +264,10 @@ fun LeveliaScreen(
                     BotonEsquina(Icons.Filled.Menu, "Menú", onMenu)
                 } else {
                     Spacer(Modifier.size(1.dp))
+                }
+                if (barraSuperior != null) {
+                    Spacer(Modifier.width(10.dp))
+                    barraSuperior()
                 }
                 if (indicadorPaso != null) {
                     Text(indicadorPaso, color = Color.White, fontSize = 14.sp)

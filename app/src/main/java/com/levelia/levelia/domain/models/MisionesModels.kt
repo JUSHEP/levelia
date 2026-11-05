@@ -7,16 +7,17 @@ import java.time.ZoneId
 fun hoyLevelia(): LocalDate = LocalDate.now(ZoneId.of("America/Bogota"))
 
 /**
- * Veces por semana y XP de cada dificultad. Mismos valores que `datos_dificultad()` en
- * supabase/misiones.sql (el servidor es quien los aplica). FACIL es "Suave" en el formulario del diseño.
+ * Veces por semana, XP y esmeraldas de cada dificultad. Mismos valores que `datos_dificultad()` en
+ * supabase/misiones.sql y `esmeraldas_dificultad()` en supabase/personalizacion.sql (el servidor es quien los
+ * aplica). FACIL es "Suave" en el formulario del diseño.
  */
-enum class Dificultad(val veces: Int, val xp: Int) {
-    FACIL(1, 75),
-    MEDIA(3, 150),
-    DIFICIL(5, 300),
+enum class Dificultad(val veces: Int, val xp: Int, val esmeraldas: Int) {
+    FACIL(1, 75, 10),
+    MEDIA(3, 150, 20),
+    DIFICIL(5, 300, 40),
 
     /** Una sola vez, antes de su fecha límite (es la única con fecha). */
-    UNICA(1, 50),
+    UNICA(1, 50, 10),
 }
 
 enum class EstadoMision { ACTIVA, COMPLETADA, PERDIDA }
@@ -115,8 +116,11 @@ object MensajesMision {
 /** Pestañas de la pantalla Misiones. */
 enum class FiltroMisiones { ACTIVAS, COMPLETADAS, TODAS }
 
-/** Resultado de "¡Reclamar recompensa!". [nivel] y [xp] son el progreso nuevo del usuario. */
-data class Recompensa(val xpGanada: Int, val nivelesSubidos: Int, val nivel: Int, val xp: Int)
+/**
+ * Resultado de "¡Reclamar recompensa!". [nivel] y [xp] son el progreso nuevo del usuario. [esmeraldas] las
+ * calcula la app para el aviso (las paga el servidor en supabase/personalizacion.sql).
+ */
+data class Recompensa(val xpGanada: Int, val nivelesSubidos: Int, val nivel: Int, val xp: Int, val esmeraldas: Int = 0)
 
 /** Pantalla Misiones (lista con pestañas) y las acciones de Detalle / Ajustar dificultad. */
 data class MisionesUiState(

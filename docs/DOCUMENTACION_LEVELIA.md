@@ -1,6 +1,6 @@
 # Levelia — documentación del proyecto
 
-> Estado al **2026-10-27**. Resume qué hace la app, cómo está construida, qué se probó y qué falta.
+> Estado al **2026-11-05**. Resume qué hace la app, cómo está construida, qué se probó y qué falta.
 > Documentos relacionados: `CONTEXTO_LEVELIA.md` (branding y medidas exactas), `QA_REPORTE.md` (pruebas y
 > hallazgos), `PROMPT_SUPABASE_LEVELIA.md` (especificación original de la base), `../CLAUDE.md` (reglas
 > para trabajar en el código).
@@ -17,8 +17,8 @@ gym, ir a clases, estudiar…), registra su progreso, gana **XP** y **sube de ni
 | 1. Autenticación (registro con código, login, recuperar contraseña) | ✅ Terminado y probado en el emulador |
 | 2. Perfil (nombre, avatar, contraseña, eliminar cuenta, nivel/XP) | ✅ Terminado y probado en el emulador |
 | 3. Misiones | ✅ Completo y probado de punta a punta (crear, ajustar, aceptar, progreso, reclamar, subir de nivel) |
-| 4. Logros | ✅ Backend y pantallas (Logros, Detalles del logro, aviso de desbloqueo); medallas provisionales |
-| Personalización, Home real | ⏳ Pendientes (la barra inferior ya tiene sus pestañas) |
+| 4. Logros | ✅ Backend y pantallas (Logros, Detalles del logro, aviso de desbloqueo); medallas provisionales. Desde el 2026-11-05 dan esmeraldas |
+| 5. Personalización (esmeraldas, skins por nivel y tienda) e Inicio | 🟡 Backend probado en Postgres local; app escrita, falta compilar y revisar en el emulador. Skins provisionales |
 
 ---
 
@@ -220,15 +220,16 @@ flowchart LR
 
 ### 4.4 Logros (módulo 4)
 
-Medallas en familias de 3 niveles (bronce, plata, oro) que **no dan XP: dan equipamiento** (casco, pechera,
-espada, botas) para el módulo Personalización.
+Medallas en familias de 3 niveles (bronce, plata, oro) que **no dan XP: dan esmeraldas**, la moneda de la
+app (bronce 50, plata 100, oro 200; columna `logros.esmeraldas`). Hasta la versión 5 de `logros.sql` daban
+piezas de equipamiento (casco, pechera, espada, botas); las tablas `articulos` e `inventario` quedan sin uso.
 
-| Logro | Requisitos | Artículo |
+| Logro | Requisitos | Esmeraldas |
 |---|---|---|
-| ¡Primeros pasos! | 1 misión cumplida | Pechera básica |
-| ¡Calentamiento! → ¡En forma! → ¡¡Unidad absoluta!! | 3 / 10 / 30 misiones físicas · racha 7 / 30 días · la anterior | Botas básicas · Pechera de plata · Pechera de oro |
-| Estudioso → ¡Pensador! → ¡¡Sabio!! | 3 / 10 / 30 misiones de estudio · racha 7 / 30 días · la anterior | Casco básico · de plata · de oro |
-| Aprendiz → ¡Junior! → ¡¡Senior!! | Nivel 5 / 10 / 25 · la anterior | Espada básica · de plata · de oro |
+| ¡Primeros pasos! | 1 misión cumplida | 50 |
+| ¡Calentamiento! → ¡En forma! → ¡¡Unidad absoluta!! | 3 / 10 / 30 misiones físicas · racha 7 / 30 días · la anterior | 50 · 100 · 200 |
+| Estudioso → ¡Pensador! → ¡¡Sabio!! | 3 / 10 / 30 misiones de estudio · racha 7 / 30 días · la anterior | 50 · 100 · 200 |
+| Aprendiz → ¡Junior! → ¡¡Senior!! | Nivel 5 / 10 / 25 · la anterior | 50 · 100 · 200 |
 
 - La categoría de una misión sale de su ícono (pesa = físico, cerebro = estudio, personas = social).
 - Una misión cuenta al cumplirla. La racha es la mayor cantidad de días seguidos con "Aumentar progreso"
@@ -247,7 +248,37 @@ espada, botas) para el módulo Personalización.
   `ic_logro_calendario.png` (reemplazar con el mismo nombre). ¡¡Sabio!! usa una copia de ¡Pensador!; los recortes
   de medallas que en el mockup salían bloqueadas quedaron apagados. Las imágenes de artículos siguen pendientes.
 
-### 4.5 Niveles y XP
+### 4.5 Personalización e Inicio (módulo 5)
+
+Acordado con el equipo el 2026-11-05. Diseño en `docs/figma/personalizacion/` (la skin "Sabio" del diseño era
+de ejemplo y no se usa).
+
+- **Esmeraldas = la única moneda.** Se ganan con logros (50 / 100 / 200) y al reclamar misiones (Fácil 10,
+  Media 20, Difícil 40, Única 10). El servidor las paga una sola vez por logro y por misión; lo ganado antes
+  de instalar el módulo también se paga la primera vez.
+- **Skins del guerrero por nivel** (se desbloquean solas): Novato (1, sin armadura), Escudero (5), Soldado (10),
+  Caballero (25), Paladín (50) y Leyenda (100). Las bloqueadas se ven como en el diseño: candado en la
+  cuadrícula y silueta con "????" en el detalle.
+- **Tienda** (el bloque "¡PRÓXIMAMENTE!" del diseño): Arquero 200, Vikingo 300, Samurái 450, Mago de
+  batalla 600, Ninja 800 y Caballero oscuro 1200. Se ven antes de comprarlas; al comprar quedan equipadas.
+- **Habilidades:** solo texto que describe la skin (no cambian la XP).
+- **Inicio** con el diseño nuevo: nombre de la skin equipada, "NVL. N", la skin grande, el usuario y "Tu
+  progreso". El menú ☰ trae "Cerrar sesión" ("Login" en el diseño), "Perfil" y "Configuraciones" (apagada,
+  sin pantalla todavía).
+
+| Parte | Archivo |
+|---|---|
+| Tablas, seguridad, funciones y catálogo de skins | `supabase/personalizacion.sql` (va después de `logros.sql` versión 6) |
+| Pruebas del SQL | `supabase/pruebas_personalizacion.sql` (`PRUEBAS_OK`) |
+| Repositorio y modelos | `PersonalizacionRepository.kt`, `PersonalizacionDtos.kt`, `PersonalizacionModels.kt` |
+| ViewModel (cargar, equipar, comprar con confirmación, avisos de skins nuevas) | `PersonalizacionViewModel.kt` (compartido, se crea en `MainActivity`) |
+| Pantallas | `PersonalizacionScreen`, `DetallesSkinScreen`, `HomeScreen`; componentes en `components/PersonalizacionUi.kt` |
+| Dibujos provisionales | `skin_<id>.png` (12) e `ic_esmeralda.png` en `drawable-nodpi` (reemplazar con el mismo nombre) |
+
+Textos propios (el diseño no los trae): botón "Equipar" / "Comprar por 💎 N", diálogos de compra, aviso
+"¡Skin desbloqueada!", subtítulo de la tienda y el "+N esmeraldas" de los avisos de recompensa y de logro.
+
+### 4.6 Niveles y XP
 
 Del nivel *n* al *n+1* hacen falta `round(100 · n^1.5)` XP (curva exponencial, estilo RPG):
 
@@ -274,6 +305,10 @@ Proyecto `ikpggszhejomdpgtujfc`. Todas las tablas tienen **RLS** (cada usuario s
 | `misiones` | catálogo: predefinidas (`user_id` null) y propias | Solo leer |
 | `misiones_usuario` | misiones aceptadas: dificultad, meta, progreso, fecha límite, estado, recompensa reclamada | Solo leer |
 | `misiones_preferencias` | dificultad guardada en "Ajustes de misión" por cada usuario (sin aceptar) | Solo leer |
+| `logros`, `logros_requisitos`, `logros_usuario` | catálogo de medallas (con sus esmeraldas), requisitos y lo obtenido | Solo leer |
+| `skins` | catálogo de skins: por nivel y de tienda (precio en esmeraldas) | Solo leer |
+| `skins_usuario`, `personaje` | skins de cada usuario y la equipada | Solo leer lo suyo |
+| `movimientos_esmeraldas` | cada esmeralda que entra o sale; el saldo es la suma | Solo leer lo suyo |
 
 | Función (RPC) | Qué hace |
 |---|---|
@@ -286,6 +321,14 @@ Proyecto `ikpggszhejomdpgtujfc`. Todas las tablas tienen **RLS** (cada usuario s
 | `vencer_mis_misiones()` | Marca perdidas las vencidas (la app la llama antes de leer) |
 | `reclamar_recompensas()` | Suma la XP y sube de nivel |
 | `xp_para_subir(nivel)`, `hoy()`, `datos_dificultad()` | Ayudas internas (curva, fecha de Colombia, tabla de dificultades) |
+| `mis_logros()`, `marcar_logros_vistos()` | Logros con su avance y esmeraldas; aviso ya mostrado |
+| `mi_personalizacion()` | Paga las esmeraldas pendientes, desbloquea skins de nivel y devuelve saldo, nivel, skin equipada y catálogo |
+| `comprar_skin(id)` | "Comprar" en la tienda (revisa el saldo) y la deja equipada |
+| `equipar_skin(id)` | "Equipar" una skin que ya tiene |
+| `marcar_skins_vistas()` | Ya se mostró "¡Skin desbloqueada!" |
+
+**Orden para instalar o actualizar la base** (SQL Editor, cada archivo completo): `setup.sql` →
+`misiones.sql` → `logros.sql` → `personalizacion.sql`. Todos se pueden volver a correr.
 
 **Configuración hecha a mano en el panel** (no está en el código):
 - Authentication → Email Templates → "Confirm signup" y "Reset password" con `{{ .Token }}` (código).
@@ -305,7 +348,7 @@ llamarlas: es intencional, es la API de la app.
 | Tipo | Dónde | Resultado |
 |---|---|---|
 | Unitarias (ViewModels con repositorio simulado, reglas, DTOs, errores) | `app/src/test/` | **109 pruebas, 0 fallos** |
-| Reglas y seguridad de la base (RLS, funciones) | `supabase/pruebas.sql`, `supabase/pruebas_misiones.sql` | `PRUEBAS_OK` (se revierten solas) |
+| Reglas y seguridad de la base (RLS, funciones) | `supabase/pruebas.sql`, `pruebas_misiones.sql`, `pruebas_logros.sql`, `pruebas_personalizacion.sql` | `PRUEBAS_OK` (se revierten solas). Las 4 pasaron el 2026-11-05 en un Postgres 16 local que imita a Supabase |
 | Visuales contra Figma | Emulador Pixel 6 (412 dp), `REVISION_EMULADOR.md`, capturas en `capturas/` | Login, registro, recuperar, Perfil y Misiones revisados |
 | Compilación en la nube | GitHub Actions `build-apk.yml` en cada push | Publica el APK `levelia-apk` |
 

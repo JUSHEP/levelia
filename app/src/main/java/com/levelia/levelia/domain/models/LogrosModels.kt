@@ -17,7 +17,10 @@ enum class EspacioArticulo { CASCO, PECHERA, ESPADA, BOTAS }
 
 enum class CalidadArticulo { BASICA, PLATA, ORO }
 
-/** Recompensa de un logro: un artículo de equipamiento. */
+/**
+ * Recompensa que daban los logros antes de logros.sql versión 6 (ahora dan esmeraldas). Se sigue leyendo por si
+ * la base todavía no se actualizó.
+ */
 data class Articulo(val id: String, val nombre: String, val espacio: EspacioArticulo, val calidad: CalidadArticulo)
 
 /** Un requisito con el avance del usuario ([actual] nunca pasa de [objetivo]). */
@@ -71,6 +74,8 @@ data class Logro(
     /** La siguiente medalla de la misma familia y su avance ("Avance para el siguiente nivel"); null = es la última. */
     val siguienteId: String?,
     val avanceSiguiente: Int?,
+    /** Esmeraldas que da al desbloquearse (bronce 50, plata 100, oro 200); las paga supabase/personalizacion.sql. */
+    val esmeraldas: Int = 0,
 ) {
     val obtenido: Boolean get() = obtenidoAt != null
     val esNuevo: Boolean get() = obtenido && !visto

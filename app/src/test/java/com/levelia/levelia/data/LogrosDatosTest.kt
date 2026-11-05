@@ -30,9 +30,10 @@ class LogrosDatosTest {
                  {"tipo":"MISIONES_CATEGORIA","categoria":"FISICO","logro_requerido":null,"titulo_requerido":null,"actual":3,"objetivo":10},
                  {"tipo":"RACHA_DIAS","categoria":null,"logro_requerido":null,"titulo_requerido":null,"actual":7,"objetivo":7},
                  {"tipo":"LOGRO","categoria":null,"logro_requerido":"CALENTAMIENTO","titulo_requerido":"¡Calentamiento!","actual":1,"objetivo":1}],
-               "progreso":77,"siguiente_id":"UNIDAD_ABSOLUTA","avance_siguiente":0}""",
+               "progreso":77,"siguiente_id":"UNIDAD_ABSOLUTA","avance_siguiente":0,"esmeraldas":100}""",
         ).aLogro()
         assertFalse(logro.obtenido)
+        assertEquals(100, logro.esmeraldas)
         assertEquals(FamiliaLogro.FISICO, logro.familia)
         assertEquals("Físico", logro.familia.texto)
         assertEquals("Nivel 2", logro.etiquetaNivel)
@@ -56,6 +57,8 @@ class LogrosDatosTest {
         assertTrue(logro.obtenido)
         assertTrue(logro.esNuevo)
         assertNull(logro.siguienteId)
+        // Base sin actualizar a logros.sql versión 6: no trae esmeraldas
+        assertEquals(0, logro.esmeraldas)
         // 00:15 UTC del 12 de septiembre = 19:15 del 11 en Colombia, como en el diseño
         assertEquals("11 - sep - 2026 - 19:15", textoFechaObtencion(logro.obtenidoAt!!))
     }

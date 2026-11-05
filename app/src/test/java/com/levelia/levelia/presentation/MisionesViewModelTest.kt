@@ -268,7 +268,30 @@ class MisionesViewModelTest {
         advanceUntilIdle()
         vm.reclamar()
         advanceUntilIdle()
-        assertEquals(Recompensa(150, 1, 2, 50), vm.estado.value.recompensa)
+        // Una misión Media cumplida: +20 esmeraldas en el aviso (las paga el servidor, la app solo las cuenta)
+        assertEquals(Recompensa(150, 1, 2, 50, esmeraldas = 20), vm.estado.value.recompensa)
+    }
+
+    @Test
+    fun `las esmeraldas del aviso suman solo las misiones por reclamar`() = runTest {
+        val enfoque = gym.copy(id = 3, titulo = "Modo enfoque")
+        coEvery { repo.obtenerMisiones() } returns AuthResult.Success(
+            listOf(
+                MisionConProgreso(gym, aceptada(EstadoMision.COMPLETADA, progreso = 3)), // Media por reclamar: 20
+                MisionConProgreso(
+                    enfoque,
+                    aceptada(EstadoMision.COMPLETADA, progreso = 1).copy(misionId = 3, dificultad = Dificultad.DIFICIL), // 40
+                ),
+                MisionConProgreso(clases, aceptada(EstadoMision.COMPLETADA, reclamada = true, progreso = 2)), // ya reclamada
+            ),
+        )
+        coEvery { repo.reclamarRecompensas() } returns AuthResult.Success(Recompensa(450, 1, 3, 10))
+        val vm = vm()
+        vm.cargar()
+        advanceUntilIdle()
+        vm.reclamar()
+        advanceUntilIdle()
+        assertEquals(60, vm.estado.value.recompensa?.esmeraldas)
     }
 
     // ========================= Crea tu propia misión =========================

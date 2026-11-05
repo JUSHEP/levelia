@@ -118,10 +118,18 @@ class MisionesViewModel @Inject constructor(
             },
         )
 
-    /** "¡Reclamar recompensa!": la XP ganada y el nivel nuevo quedan en [MisionesUiState.recompensa]. */
+    /**
+     * "¡Reclamar recompensa!": la XP ganada, el nivel nuevo y las esmeraldas quedan en [MisionesUiState.recompensa].
+     * Las esmeraldas las paga el servidor (supabase/personalizacion.sql); aquí solo se cuentan para el aviso,
+     * con la misma tabla ([Dificultad.esmeraldas]).
+     */
     fun reclamar() {
         if (!_estado.value.hayRecompensas) return
-        enviar(accion = { repo.reclamarRecompensas() }, alTerminar = { r -> _estado.update { it.copy(recompensa = r) } })
+        val esmeraldas = _estado.value.misiones.filter { it.porReclamar }.sumOf { it.aceptada?.dificultad?.esmeraldas ?: 0 }
+        enviar(
+            accion = { repo.reclamarRecompensas() },
+            alTerminar = { r -> _estado.update { it.copy(recompensa = r.copy(esmeraldas = esmeraldas)) } },
+        )
     }
 
     // ========================= CREA TU PROPIA MISIÓN =========================

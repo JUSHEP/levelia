@@ -30,6 +30,8 @@ data class LogroDto(
     val progreso: Int = 0,
     @SerialName("siguiente_id") val siguienteId: String? = null,
     @SerialName("avance_siguiente") val avanceSiguiente: Int? = null,
+    /** Desde logros.sql versión 6. Con una base vieja no llega y queda en 0. */
+    val esmeraldas: Int = 0,
 ) {
     fun aLogro() = Logro(
         id = id,
@@ -48,6 +50,7 @@ data class LogroDto(
         progreso = progreso,
         siguienteId = siguienteId,
         avanceSiguiente = avanceSiguiente,
+        esmeraldas = esmeraldas,
     )
 }
 

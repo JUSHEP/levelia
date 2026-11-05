@@ -85,7 +85,8 @@ fun MisionesScreen(
             estado.recompensa?.let { r ->
                 LeveliaDialog(
                     titulo = "¡Recompensa reclamada!",
-                    mensaje = "Ganaste +${r.xpGanada} XP." +
+                    mensaje = "Ganaste +${r.xpGanada} XP" +
+                        (if (r.esmeraldas > 0) " y +${r.esmeraldas} esmeraldas." else ".") +
                         if (r.nivelesSubidos > 0) " ¡Subiste al nivel ${r.nivel}!" else " Sigues en el nivel ${r.nivel}.",
                     icono = R.drawable.ic_dialog_ok,
                     onEntendido = onCerrarAviso,
