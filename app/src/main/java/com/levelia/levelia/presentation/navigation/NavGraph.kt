@@ -23,6 +23,7 @@ import androidx.navigation.navArgument
 import com.levelia.levelia.domain.ReglasPerfil
 import com.levelia.levelia.domain.models.Destinations
 import com.levelia.levelia.domain.models.EstadoMision
+import com.levelia.levelia.domain.models.NIVELES_DEMO_POR_DEFECTO
 import com.levelia.levelia.domain.models.TipoDialogoPerfil
 import com.levelia.levelia.ui.theme.BotonGuardar
 import com.levelia.levelia.presentation.screens.CambiarAvatarScreen
@@ -39,6 +40,7 @@ import com.levelia.levelia.presentation.screens.HomeScreen
 import com.levelia.levelia.presentation.screens.LoginScreen
 import com.levelia.levelia.presentation.screens.LogrosScreen
 import com.levelia.levelia.presentation.screens.MisionesScreen
+import com.levelia.levelia.presentation.screens.ModoDemoScreen
 import com.levelia.levelia.presentation.screens.PerfilScreen
 import com.levelia.levelia.presentation.screens.PersonalizacionScreen
 import com.levelia.levelia.presentation.screens.RecoverPasswordScreen
@@ -55,6 +57,7 @@ import com.levelia.levelia.presentation.screens.components.TabInferior
 import com.levelia.levelia.presentation.viewmodel.AuthViewModel
 import com.levelia.levelia.presentation.viewmodel.LogrosViewModel
 import com.levelia.levelia.presentation.viewmodel.MisionesViewModel
+import com.levelia.levelia.presentation.viewmodel.ModoDemoViewModel
 import com.levelia.levelia.presentation.viewmodel.PerfilViewModel
 import com.levelia.levelia.presentation.viewmodel.PersonalizacionViewModel
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -85,12 +88,13 @@ private val RUTAS_PROTEGIDAS = listOf(
     Destinations.DetallesLogroScreen.route,
     Destinations.PersonalizacionScreen.route,
     Destinations.DetallesSkinScreen.route,
+    Destinations.ModoDemoScreen.route,
 )
 
 /**
- * Los ViewModels ([authViewModel], [perfilViewModel], [misionesViewModel], [logrosViewModel] y
- * [personalizacionViewModel]) deben crearse fuera del NavHost (ver MainActivity): si cada destino llamara a
- * hiltViewModel() tendría su propia instancia y el estado se perdería entre pantallas.
+ * Los ViewModels ([authViewModel], [perfilViewModel], [misionesViewModel], [logrosViewModel],
+ * [personalizacionViewModel] y [modoDemoViewModel]) deben crearse fuera del NavHost (ver MainActivity): si cada
+ * destino llamara a hiltViewModel() tendría su propia instancia y el estado se perdería entre pantallas.
  */
 @Composable
 fun NavGraph(
@@ -99,6 +103,7 @@ fun NavGraph(
     misionesViewModel: MisionesViewModel,
     logrosViewModel: LogrosViewModel,
     personalizacionViewModel: PersonalizacionViewModel,
+    modoDemoViewModel: ModoDemoViewModel,
     modifier: Modifier = Modifier,
     navController: NavHostController = rememberNavController(),
 ) {
@@ -108,7 +113,8 @@ fun NavGraph(
         LeveliaBackground {}
     } else {
         NavGraphContenido(
-            authViewModel, perfilViewModel, misionesViewModel, logrosViewModel, personalizacionViewModel, modifier, navController,
+            authViewModel, perfilViewModel, misionesViewModel, logrosViewModel, personalizacionViewModel, modoDemoViewModel,
+            modifier, navController,
         )
     }
 }
@@ -120,6 +126,7 @@ private fun NavGraphContenido(
     misionesViewModel: MisionesViewModel,
     logrosViewModel: LogrosViewModel,
     personalizacionViewModel: PersonalizacionViewModel,
+    modoDemoViewModel: ModoDemoViewModel,
     modifier: Modifier,
     navController: NavHostController,
 ) {
@@ -155,10 +162,12 @@ private fun NavGraphContenido(
                 misionesViewModel.limpiar()
                 logrosViewModel.limpiar()
                 personalizacionViewModel.limpiar()
+                modoDemoViewModel.limpiar()
             } else {
                 // Para avisar los logros y las skins que se ganaron y aún no se mostraron
                 logrosViewModel.cargar()
                 personalizacionViewModel.cargar()
+                modoDemoViewModel.cargar()
             }
             val rutaActual = navController.currentDestination?.route ?: return@collect
             if (autenticado && rutaActual != Destinations.HomeScreen.route) {
@@ -198,6 +207,22 @@ private fun NavGraphContenido(
             .distinctUntilChanged()
             .collect {
                 if (it != null) {
+                    logrosViewModel.cargar()
+                    personalizacionViewModel.cargar()
+                }
+            }
+    }
+
+    // El modo demo cambia en el servidor el nivel, las fechas, los logros y las skins: se relee todo (y así salen
+    // los avisos de logro y de skin, igual que al reclamar)
+    LaunchedEffect(modoDemoViewModel) {
+        modoDemoViewModel.estado
+            .map { it.cambios }
+            .distinctUntilChanged()
+            .collect { cambios ->
+                if (cambios > 0) {
+                    perfilViewModel.cargarPerfil(authViewModel.user.value)
+                    misionesViewModel.cargar()
                     logrosViewModel.cargar()
                     personalizacionViewModel.cargar()
                 }
@@ -368,11 +393,13 @@ private fun NavGraphContenido(
                 val user by authViewModel.user.collectAsStateWithLifecycle()
                 val perfil by perfilViewModel.perfil.collectAsStateWithLifecycle()
                 val personalizacion by personalizacionViewModel.estado.collectAsStateWithLifecycle()
+                val demo by modoDemoViewModel.estado.collectAsStateWithLifecycle()
 
                 // Nivel, XP y skin equipada: se vuelven a leer de la base cada vez que se abre Inicio
                 LaunchedEffect(Unit) {
                     perfilViewModel.cargarPerfil(user)
                     personalizacionViewModel.cargar()
+                    modoDemoViewModel.cargar()
                 }
 
                 HomeScreen(
@@ -381,6 +408,41 @@ private fun NavGraphContenido(
                     skin = personalizacion.equipada,
                     onPerfil = { navController.irATab(TabInferior.PERFIL) },
                     onCerrarSesion = authViewModel::logout,
+                    onTab = { navController.irATab(it) },
+                    onModoDemo = if (demo.activo) ({ navController.navigate(Destinations.ModoDemoScreen.route) }) else null,
+                )
+            }
+
+            // ------------------------------ Modo demo (supabase/modo_demo.sql) ------------------------------
+
+            composable(Destinations.ModoDemoScreen.route) {
+                val user by authViewModel.user.collectAsStateWithLifecycle()
+                val demo by modoDemoViewModel.estado.collectAsStateWithLifecycle()
+                val perfil by perfilViewModel.perfil.collectAsStateWithLifecycle()
+                val personalizacion by personalizacionViewModel.estado.collectAsStateWithLifecycle()
+
+                LaunchedEffect(Unit) {
+                    modoDemoViewModel.cargar()
+                    perfilViewModel.cargarPerfil(user)
+                    personalizacionViewModel.cargar()
+                }
+
+                ModoDemoScreen(
+                    estado = demo,
+                    progreso = perfil.progreso,
+                    esmeraldas = personalizacion.esmeraldas,
+                    // Los niveles de las skins del guerrero (sin la inicial)
+                    niveles = personalizacion.deNivel.mapNotNull { it.nivelRequerido }.filter { it > 1 }
+                        .ifEmpty { NIVELES_DEMO_POR_DEFECTO },
+                    onBack = { navController.popBackStack() },
+                    onAvanzarDia = modoDemoViewModel::avanzarDia,
+                    onPrepararNivel = modoDemoViewModel::prepararNivel,
+                    onSubirNivel = modoDemoViewModel::subirNivel,
+                    onSumarEsmeraldas = modoDemoViewModel::sumarEsmeraldas,
+                    onReiniciar = modoDemoViewModel::pedirReinicio,
+                    onConfirmarReinicio = modoDemoViewModel::confirmarReinicio,
+                    onCancelarConfirmacion = modoDemoViewModel::cancelarConfirmacion,
+                    onCerrarError = modoDemoViewModel::cerrarError,
                     onTab = { navController.irATab(it) },
                 )
             }

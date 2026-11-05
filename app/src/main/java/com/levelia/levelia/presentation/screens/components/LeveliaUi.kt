@@ -194,6 +194,11 @@ fun LeveliaScreen(
     indicadorPaso: String? = null,
     espacioSuperior: Dp = 80.dp,
     margenHorizontal: Dp = 43.dp,
+    /**
+     * false = el contenido no tiene scroll y mide justo el alto visible, así un hijo con `Modifier.weight(1f)`
+     * ocupa lo que sobre (Inicio: la skin). Solo para pantallas sin campos de texto.
+     */
+    desplazable: Boolean = true,
     /** Si no es null, la esquina superior izquierda muestra el botón de menú (hamburguesa) en vez de la flecha. */
     onMenu: (() -> Unit)? = null,
     /** Lo que va en la misma fila de la flecha, a su derecha (título y contador de Personalización). */
@@ -250,7 +255,7 @@ fun LeveliaScreen(
                 .fillMaxSize()
                 .imePadding()
                 .windowInsetsPadding(WindowInsets.statusBars)
-                .verticalScroll(rememberScrollState())
+                .then(if (desplazable) Modifier.verticalScroll(rememberScrollState()) else Modifier)
                 .padding(horizontal = margenHorizontal),
         ) {
             Row(

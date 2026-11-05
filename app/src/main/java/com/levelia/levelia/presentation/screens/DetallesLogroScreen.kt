@@ -46,7 +46,7 @@ import com.levelia.levelia.ui.theme.PressStart2P
 /**
  * "Detalles del logro". Desbloqueado: medalla, requisitos cumplidos, fecha de obtención y "Completado".
  * Bloqueado: candado, familia y nivel, requisitos con su avance, "Progreso general" y "Avance para el
- * siguiente nivel" (la medalla [siguiente] de la misma familia; null = es la última).
+ * siguiente nivel" (la medalla [siguiente]: el logro que pide a este, según logros.sql; null = es la última).
  */
 @Composable
 fun DetallesLogroScreen(

@@ -89,6 +89,7 @@ sealed class Destinations(val route: String) {
     data object DetallesSkinScreen : Destinations("detalles_skin/{skinId}") {
         fun conId(skinId: String) = "detalles_skin/$skinId"
     }
+    data object ModoDemoScreen : Destinations("modo_demo")
 }
 
 /**

@@ -82,7 +82,13 @@ fun recursoSkin(id: String?): Int = when (id) {
     else -> R.drawable.skin_novato
 }
 
-/** La skin en pixel-art. [silueta] = bloqueada: solo la forma, en morado (como el diseño). */
+/**
+ * La skin en pixel-art. [silueta] = bloqueada: solo la forma, en morado (como el diseño).
+ *
+ * Toma todo el ancho disponible; el alto lo pone quien la usa (`height` o `weight`) y el dibujo crece hasta
+ * llenar ese espacio sin deformarse. Sin el ancho, `Image` mide lo que mide el PNG en píxeles y la skin se veía
+ * diminuta en medio de su espacio.
+ */
 @Composable
 fun ImagenSkin(
     skinId: String?,
@@ -96,7 +102,7 @@ fun ImagenSkin(
         contentScale = ContentScale.Fit,
         filterQuality = FilterQuality.None,
         colorFilter = if (silueta) ColorFilter.tint(SkinSilueta, BlendMode.SrcIn) else null,
-        modifier = modifier,
+        modifier = modifier.fillMaxWidth(),
     )
 }
 

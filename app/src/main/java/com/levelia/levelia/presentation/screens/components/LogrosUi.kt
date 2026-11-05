@@ -64,6 +64,8 @@ val MARGEN_LOGROS = 31.dp
 /**
  * Medalla de cada logro (recortes provisionales del diseño: reemplazar con el mismo nombre). Los ids son
  * los del catálogo de supabase/logros.sql; ¡¡Sabio!! todavía no tiene dibujo y usa el de ¡Pensador!.
+ * Las de la versión 7 (desde CONSTANTE) son provisionales hechas con las del diseño: un símbolo nuevo en el marco
+ * de bronce, plata u oro, o una medalla recoloreada (amatista, diamante, rubí) para las que van después del oro.
  */
 @DrawableRes
 fun Logro.recurso(): Int = when (id) {
@@ -77,6 +79,25 @@ fun Logro.recurso(): Int = when (id) {
     "JUNIOR" -> R.drawable.logro_junior
     "SENIOR" -> R.drawable.logro_senior
     "SABIO" -> R.drawable.logro_sabio
+    "CONSTANTE" -> R.drawable.logro_constante
+    "IMPARABLE" -> R.drawable.logro_imparable
+    "CENTENARIO" -> R.drawable.logro_centenario
+    "EN_RACHA" -> R.drawable.logro_en_racha
+    "DISCIPLINADO" -> R.drawable.logro_disciplinado
+    "INQUEBRANTABLE" -> R.drawable.logro_inquebrantable
+    "ROMPEHIELOS" -> R.drawable.logro_rompehielos
+    "SOCIABLE" -> R.drawable.logro_sociable
+    "ALMA_DE_LA_FIESTA" -> R.drawable.logro_alma_de_la_fiesta
+    "ORGANIZADO" -> R.drawable.logro_organizado
+    "PRODUCTIVO" -> R.drawable.logro_productivo
+    "MAESTRO_DEL_TIEMPO" -> R.drawable.logro_maestro_del_tiempo
+    "ATLETA" -> R.drawable.logro_atleta
+    "TITAN" -> R.drawable.logro_titan
+    "ERUDITO" -> R.drawable.logro_erudito
+    "GENIO" -> R.drawable.logro_genio
+    "VETERANO" -> R.drawable.logro_veterano
+    "MAESTRO" -> R.drawable.logro_maestro
+    "LEYENDA_VIVA" -> R.drawable.logro_leyenda_viva
     // Un logro nuevo del servidor sin dibujo en esta versión de la app
     else -> R.drawable.logro_primeros_pasos
 }

@@ -18,7 +18,8 @@ gym, ir a clases, estudiar…), registra su progreso, gana **XP** y **sube de ni
 | 2. Perfil (nombre, avatar, contraseña, eliminar cuenta, nivel/XP) | ✅ Terminado y probado en el emulador |
 | 3. Misiones | ✅ Completo y probado de punta a punta (crear, ajustar, aceptar, progreso, reclamar, subir de nivel) |
 | 4. Logros | ✅ Backend y pantallas (Logros, Detalles del logro, aviso de desbloqueo); medallas provisionales. Desde el 2026-11-05 dan esmeraldas |
-| 5. Personalización (esmeraldas, skins por nivel y tienda) e Inicio | 🟡 Backend probado en Postgres local; app escrita, falta compilar y revisar en el emulador. Skins provisionales |
+| 5. Personalización (esmeraldas, skins por nivel y tienda) e Inicio | 🟡 Backend probado en Postgres local; la app compila y pasa las pruebas en GitHub Actions, falta revisarla en el emulador. Skins provisionales |
+| Modo demo (para mostrar la app sin esperar días) | 🟡 Backend probado en Postgres local; app escrita, falta revisarla en el celular |
 
 ---
 
@@ -188,7 +189,9 @@ de la tabla `progreso`; la meta del nivel sale de la curva de niveles.
 - "Ajustar dificultad" → "Guardar cambios" guarda la dificultad **en la base sin aceptar** la misión
   (tabla `misiones_preferencias`) y vuelve a la lista con las nuevas veces y XP. Al aceptar se usa la
   guardada. No se puede ajustar una misión en curso ni una Única (necesita fecha).
-- Predefinidas (las 4 del diseño) visibles para todos; las creadas por un usuario solo las ve él.
+- Predefinidas visibles para todos: las 4 del diseño y, desde `misiones.sql` versión 5, 24 más (6 físicas,
+  6 de estudio, 6 sociales y 6 de otro tipo, con las veces y XP de su dificultad). Las creadas por un usuario
+  solo las ve él.
 - Pestañas: **Activas** = aceptadas y en curso (vacía hasta aceptar una) · **Completadas** = cumplidas,
   reclamadas o no (ahí sale "¡Reclamar recompensa!" si falta XP por sumar) · **Todas** = el catálogo
   completo, primero las que aún no están cumplidas.
@@ -230,13 +233,25 @@ piezas de equipamiento (casco, pechera, espada, botas); las tablas `articulos` e
 | ¡Calentamiento! → ¡En forma! → ¡¡Unidad absoluta!! | 3 / 10 / 30 misiones físicas · racha 7 / 30 días · la anterior | 50 · 100 · 200 |
 | Estudioso → ¡Pensador! → ¡¡Sabio!! | 3 / 10 / 30 misiones de estudio · racha 7 / 30 días · la anterior | 50 · 100 · 200 |
 | Aprendiz → ¡Junior! → ¡¡Senior!! | Nivel 5 / 10 / 25 · la anterior | 50 · 100 · 200 |
+| Constante → ¡Imparable! → ¡¡Centenario!! | 10 / 50 / 100 misiones · la anterior | 50 · 100 · 200 |
+| En racha → ¡Disciplinado! → ¡¡Inquebrantable!! | Racha de 7 / 30 / 100 días · la anterior | 50 · 100 · 200 |
+| Rompehielos → ¡Sociable! → ¡¡Alma de la fiesta!! | 3 / 10 / 30 misiones sociales · racha 7 / 30 días · la anterior | 50 · 100 · 200 |
+| Organizado → ¡Productivo! → ¡¡Maestro del tiempo!! | 3 / 10 / 30 misiones de otro tipo · racha 7 / 30 días · la anterior | 50 · 100 · 200 |
+| ¡¡Atleta!! → ¡¡Titán!! (después de ¡¡Unidad absoluta!!) | 60 / 100 misiones físicas · la anterior | 200 · 200 |
+| ¡¡Erudito!! → ¡¡Genio!! (después de ¡¡Sabio!!) | 60 / 100 misiones de estudio · la anterior | 200 · 200 |
+| ¡¡Veterano!! → ¡¡Maestro!! → ¡¡Leyenda viva!! (después de ¡¡Senior!!) | Nivel 50 / 75 / 100 · la anterior | 200 · 200 · 200 |
 
-- La categoría de una misión sale de su ícono (pesa = físico, cerebro = estudio, personas = social).
+Los 10 primeros son los del diseño; los otros 19 llegaron con `logros.sql` versión 7 (2026-11-05) para tener
+metas hasta el nivel 100. Los sociales y de otro tipo van en la familia "General": una familia nueva rompería
+la lista en las versiones de la app ya instaladas.
+
+- La categoría de una misión sale de su ícono (pesa = físico, cerebro = estudio, personas = social,
+  portapapeles = otro tipo).
 - Una misión cuenta al cumplirla. La racha es la mayor cantidad de días seguidos con "Aumentar progreso"
   (tabla `registros_progreso`).
-- El servidor desbloquea solo (al registrar progreso, al reclamar XP y al abrir Logros), guarda la fecha y
-  entrega el artículo en `inventario`. `mis_logros()` trae para cada logro el avance de sus requisitos, el
-  "Progreso general" y el "Avance para el siguiente nivel" (la siguiente medalla de su familia).
+- El servidor desbloquea solo (al registrar progreso, al reclamar XP y al abrir Logros) y guarda la fecha.
+  `mis_logros()` trae para cada logro el avance de sus requisitos, el "Progreso general" y el "Avance para el
+  siguiente nivel" (desde la versión 7, el logro que tiene a este como requisito).
 - App: `LogrosRepository`, `LogrosViewModel` (`cargar`, `onFiltro`, `logro(id)`, `nuevos`, `cerrarNuevos`,
   `limpiar`) y textos en `LogrosModels.kt` ("Completar 10 misiones físicas", "11 - sep - 2026 - 19:15").
 - Pantallas: `LogrosScreen` (pestañas Obtenidos / Todos, cuadrícula de 3) y `DetallesLogroScreen`
@@ -247,6 +262,8 @@ piezas de equipamiento (casco, pechera, espada, botas); las tablas `articulos` e
 - Imágenes provisionales recortadas de los mockups: `logro_<id>.png`, `ic_logro_bloqueado.png`,
   `ic_logro_calendario.png` (reemplazar con el mismo nombre). ¡¡Sabio!! usa una copia de ¡Pensador!; los recortes
   de medallas que en el mockup salían bloqueadas quedaron apagados. Las imágenes de artículos siguen pendientes.
+  Las 19 medallas de la versión 7 son provisionales armadas con las del diseño (un símbolo nuevo en el marco de
+  bronce, plata u oro, o una medalla recoloreada en amatista, diamante o rubí para las que van después del oro).
 
 ### 4.5 Personalización e Inicio (módulo 5)
 
@@ -264,7 +281,8 @@ de ejemplo y no se usa).
 - **Habilidades:** solo texto que describe la skin (no cambian la XP).
 - **Inicio** con el diseño nuevo: nombre de la skin equipada, "NVL. N", la skin grande, el usuario y "Tu
   progreso". El menú ☰ trae "Cerrar sesión" ("Login" en el diseño), "Perfil" y "Configuraciones" (apagada,
-  sin pantalla todavía).
+  sin pantalla todavía); en las cuentas demo, también "Modo demo". Inicio no tiene scroll: la skin ocupa todo
+  el alto que dejan los demás elementos (antes se dibujaba al tamaño en píxeles del PNG y se veía diminuta).
 
 | Parte | Archivo |
 |---|---|
@@ -278,18 +296,48 @@ de ejemplo y no se usa).
 Textos propios (el diseño no los trae): botón "Equipar" / "Comprar por 💎 N", diálogos de compra, aviso
 "¡Skin desbloqueada!", subtítulo de la tienda y el "+N esmeraldas" de los avisos de recompensa y de logro.
 
-### 4.6 Niveles y XP
+### 4.6 Modo demo
 
-Del nivel *n* al *n+1* hacen falta `round(100 · n^1.5)` XP (curva exponencial, estilo RPG):
+Para mostrar la app (por ejemplo al profesor) sin esperar días. Es lo que se suele hacer en desarrollo: un
+menú oculto que solo aparece en cuentas marcadas como de prueba, y que el servidor rechaza para las demás.
 
-| Nivel | XP para subir | | Nivel | XP para subir |
-|---|---|---|---|---|
-| 1 → 2 | 100 | | 10 → 11 | 3 162 |
-| 2 → 3 | 283 | | 50 → 51 | 35 355 |
-| 3 → 4 | 520 | | 99 → 100 | 98 504 |
+- **Marcar una cuenta** (SQL Editor, cambiando el nombre de usuario):
+  `insert into public.cuentas_demo (user_id) select id from public.perfiles where lower(nombre) = lower('NombreDeUsuario') on conflict do nothing;`
+- En esa cuenta, el menú ☰ de Inicio muestra **"Modo demo"**, con:
+  - **Avanzar 1 día:** corre un día hacia atrás las fechas de las misiones de la cuenta, que es lo mismo que si
+    hubiera pasado un día: se puede volver a registrar progreso, vencen los plazos y las rachas siguen. No se
+    cambia la fecha del celular ni de la base.
+  - **Dejar listo para subir al nivel 5 / 10 / 25 / 50 / 100:** deja la cuenta un nivel antes, a 1 XP de subir.
+    Al cumplir y reclamar cualquier misión sube de nivel y salen los avisos de logro y de skin, como de verdad.
+  - **+1 nivel**, **+500 esmeraldas** (para la tienda) y **Reiniciar cuenta demo** (nivel 1, sin misiones,
+    logros, skins ni esmeraldas, para repetir la demostración).
+- Una cuenta normal no ve la opción y las funciones le responden `NO_ES_DEMO`. La app nunca escribe en
+  `cuentas_demo`.
+
+| Parte | Archivo |
+|---|---|
+| Tabla, funciones y seguridad | `supabase/modo_demo.sql` (va al final, después de `personalizacion.sql`) |
+| Pruebas del SQL | `supabase/pruebas_modo_demo.sql` (`PRUEBAS_OK`) |
+| App | `ModoDemoRepository.kt`, `ModoDemoDtos.kt`, `ModoDemoModels.kt`, `ModoDemoViewModel.kt` (compartido, en `MainActivity`), `ModoDemoScreen.kt` (sin diseño de Figma: usa los componentes de la app) |
+
+### 4.7 Niveles y XP
+
+Del nivel *n* al *n+1* hacen falta `100 + 10 · (n − 1)` XP: cada nivel pide 10 XP más que el anterior.
+Cambiada el 2026-11-05: la curva anterior, `round(100 · n^1.5)`, pedía 3 950 120 XP para llegar al nivel 100
+(unas 13 000 misiones difíciles), así que las skins de nivel 25, 50 y 100 eran imposibles.
+
+| Llegar al nivel | XP total | Con unas 6 misiones por semana |
+|---|---|---|
+| 5 | 460 | menos de una semana |
+| 10 | 1 260 | 1 o 2 semanas |
+| 25 | 5 160 | ~5 semanas |
+| 50 | 16 660 | ~4 meses (un semestre) |
+| 100 | 58 410 | ~1 año |
 
 `progreso.xp` es la XP **dentro del nivel actual** (la barra del Perfil). Al reclamar, el servidor suma,
-sube todos los niveles que alcance y guarda lo que sobra. El máximo es el nivel 100.
+sube todos los niveles que alcance y guarda lo que sobra. El máximo es el nivel 100. Al instalar
+`misiones.sql` versión 5, quien tenía más XP de la que pide su nivel con la curva nueva sube de nivel en ese
+momento.
 
 ---
 
@@ -309,6 +357,7 @@ Proyecto `ikpggszhejomdpgtujfc`. Todas las tablas tienen **RLS** (cada usuario s
 | `skins` | catálogo de skins: por nivel y de tienda (precio en esmeraldas) | Solo leer |
 | `skins_usuario`, `personaje` | skins de cada usuario y la equipada | Solo leer lo suyo |
 | `movimientos_esmeraldas` | cada esmeralda que entra o sale; el saldo es la suma | Solo leer lo suyo |
+| `cuentas_demo` | cuentas con modo demo (se llena a mano desde el SQL Editor) | Nada (usa `mi_modo_demo()`) |
 
 | Función (RPC) | Qué hace |
 |---|---|
@@ -326,9 +375,11 @@ Proyecto `ikpggszhejomdpgtujfc`. Todas las tablas tienen **RLS** (cada usuario s
 | `comprar_skin(id)` | "Comprar" en la tienda (revisa el saldo) y la deja equipada |
 | `equipar_skin(id)` | "Equipar" una skin que ya tiene |
 | `marcar_skins_vistas()` | Ya se mostró "¡Skin desbloqueada!" |
+| `mi_modo_demo()` | ¿La cuenta es demo? (a las normales les responde que no) |
+| `demo_avanzar_dia()`, `demo_preparar_nivel(n)`, `demo_subir_nivel()`, `demo_sumar_esmeraldas()`, `demo_reiniciar()` | Botones del modo demo (solo cuentas demo) |
 
 **Orden para instalar o actualizar la base** (SQL Editor, cada archivo completo): `setup.sql` →
-`misiones.sql` → `logros.sql` → `personalizacion.sql`. Todos se pueden volver a correr.
+`misiones.sql` → `logros.sql` → `personalizacion.sql` → `modo_demo.sql`. Todos se pueden volver a correr.
 
 **Configuración hecha a mano en el panel** (no está en el código):
 - Authentication → Email Templates → "Confirm signup" y "Reset password" con `{{ .Token }}` (código).
@@ -347,8 +398,8 @@ llamarlas: es intencional, es la API de la app.
 
 | Tipo | Dónde | Resultado |
 |---|---|---|
-| Unitarias (ViewModels con repositorio simulado, reglas, DTOs, errores) | `app/src/test/` | **109 pruebas, 0 fallos** |
-| Reglas y seguridad de la base (RLS, funciones) | `supabase/pruebas.sql`, `pruebas_misiones.sql`, `pruebas_logros.sql`, `pruebas_personalizacion.sql` | `PRUEBAS_OK` (se revierten solas). Las 4 pasaron el 2026-11-05 en un Postgres 16 local que imita a Supabase |
+| Unitarias (ViewModels con repositorio simulado, reglas, DTOs, errores) | `app/src/test/` | **144 pruebas** (GitHub Actions) |
+| Reglas y seguridad de la base (RLS, funciones) | `supabase/pruebas.sql`, `pruebas_misiones.sql`, `pruebas_logros.sql`, `pruebas_personalizacion.sql`, `pruebas_modo_demo.sql` | `PRUEBAS_OK` (se revierten solas). Las 5 pasaron el 2026-11-05 en un Postgres 16 local que imita a Supabase, con la base nueva, corriendo todo dos veces y actualizando una base con datos viejos |
 | Visuales contra Figma | Emulador Pixel 6 (412 dp), `REVISION_EMULADOR.md`, capturas en `capturas/` | Login, registro, recuperar, Perfil y Misiones revisados |
 | Compilación en la nube | GitHub Actions `build-apk.yml` en cada push | Publica el APK `levelia-apk` |
 
@@ -415,12 +466,15 @@ teléfono (el login solo recuerda el correo).
 (plantilla con `{{ .Token }}`); la app lo verifica con `verifyEmailOtp` (tipo SIGNUP o RECOVERY).
 
 **¿Cómo se sube de nivel?** Al reclamar recompensas, el servidor suma la XP y aplica la curva
-`round(100 · n^1.5)`: subir del 1 al 2 cuesta 100 XP y del 99 al 100 cuesta 98 504.
+`100 + 10 · (n − 1)`: subir del 1 al 2 cuesta 100 XP y del 99 al 100 cuesta 1 080 (58 410 en total).
 
 **¿Cómo se evita hacer trampa con la XP?** Un registro por día, plazo de 7 días, la XP solo se suma una
 vez por misión cumplida y no se puede repetir una misión dentro de su plazo. Todo lo valida el servidor.
 
-**¿Cómo se prueba?** 109 pruebas unitarias (lógica sin emulador, con datos simulados), pruebas SQL contra
+**¿Cómo se prueba?** 144 pruebas unitarias (lógica sin emulador, con datos simulados), pruebas SQL contra
 la base real que se revierten solas, y revisión visual en el emulador contra las capturas de Figma.
+
+**¿Cómo muestran que se desbloquean las skins sin esperar días?** Con el modo demo: una cuenta marcada en la
+base tiene botones para adelantar días, dejarla a punto de subir de nivel y sumar esmeraldas (sección 4.6).
 
 **¿Qué pasa sin internet?** La app muestra la pantalla "Sin conexión" encima de todo hasta que vuelva.

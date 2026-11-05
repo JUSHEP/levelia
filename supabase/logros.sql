@@ -1,14 +1,16 @@
 -- =============================================================================
--- Levelia · módulo Logros (versión 6). Se corre DESPUÉS de supabase/misiones.sql.
+-- Levelia · módulo Logros (versión 7). Se corre DESPUÉS de supabase/misiones.sql.
 --
 -- Cómo usarlo: Supabase → SQL Editor → pegar TODO → Run. Es idempotente.
 -- Pruebas: supabase/pruebas_logros.sql (debe terminar con un error que dice PRUEBAS_OK).
+-- Versión 7 (2026-11-05): 19 logros más (hasta el nivel 100, rachas de 100 días, 100 misiones) y la "siguiente
+-- medalla" ahora es el logro que pide a este (antes: misma familia, un nivel más).
 --
 -- Qué crea:
 --   categoria_mision()   FISICO / ESTUDIO / SOCIAL / OTRO, sacada del ícono de la misión
 --   articulos            equipamiento del personaje (casco, pechera, espada, botas). Desde la versión 6 ya
 --                        no se entrega: queda solo para no romper lo que ya estaba guardado
---   logros               catálogo de medallas (familia y nivel 1–3) con las esmeraldas que dan
+--   logros               catálogo de medallas (familia y nivel 1–3 = bronce, plata, oro) con las esmeraldas que dan
 --   logros_requisitos    lo que pide cada logro (misiones, misiones de una categoría, racha, nivel, otro logro)
 --   logros_usuario       qué logro obtuvo cada usuario y cuándo (visto = ya se le avisó en la app)
 --   inventario           artículos ganados antes de la versión 6 (ya no se llena)
@@ -25,6 +27,9 @@
 --   - Los logros no dan XP: dan ESMERALDAS, la moneda de la app (bronce 50, plata 100, oro 200). Las paga
 --     supabase/personalizacion.sql, una sola vez por logro.
 --   - Las metas y recompensas son datos de este archivo: se cambian aquí y se vuelve a correr.
+--   - Siguiente medalla ("Avance para el siguiente nivel"): el logro que tiene a este como requisito LOGRO.
+--   - Las misiones sociales y de otro tipo no tienen familia propia: sus logros van en GENERAL (una familia
+--     nueva rompería la lista en las versiones de la app ya instaladas).
 -- =============================================================================
 
 -- -----------------------------------------------------------------------------
@@ -156,7 +161,27 @@ insert into public.logros (id, titulo, descripcion, familia, nivel, orden, artic
   ('APRENDIZ',        'Aprendiz',            'Llega al nivel 5.',                                                  'NIVEL',   1, 7,  null, 50),
   ('JUNIOR',          '¡Junior!',            'Llega al nivel 10.',                                                 'NIVEL',   2, 8,  null, 100),
   ('SENIOR',          '¡¡Senior!!',          'Llega al nivel 25.',                                                 'NIVEL',   3, 9,  null, 200),
-  ('SABIO',           '¡¡Sabio!!',           'Completa 30 misiones de estudio y mantén una racha de 30 días.',     'ESTUDIO', 3, 10, null, 200)
+  ('SABIO',           '¡¡Sabio!!',           'Completa 30 misiones de estudio y mantén una racha de 30 días.',     'ESTUDIO', 3, 10, null, 200),
+  -- Versión 7: cadenas nuevas (cada una pide la anterior) para tener metas hasta el nivel 100
+  ('CONSTANTE',          'Constante',              'Completa 10 misiones.',                                            'GENERAL', 1, 11, null, 50),
+  ('IMPARABLE',          '¡Imparable!',            'Completa 50 misiones.',                                            'GENERAL', 2, 12, null, 100),
+  ('CENTENARIO',         '¡¡Centenario!!',         'Completa 100 misiones.',                                           'GENERAL', 3, 13, null, 200),
+  ('EN_RACHA',           'En racha',               'Mantén una racha de 7 días.',                                      'GENERAL', 1, 14, null, 50),
+  ('DISCIPLINADO',       '¡Disciplinado!',         'Mantén una racha de 30 días.',                                     'GENERAL', 2, 15, null, 100),
+  ('INQUEBRANTABLE',     '¡¡Inquebrantable!!',     'Mantén una racha de 100 días.',                                    'GENERAL', 3, 16, null, 200),
+  ('ROMPEHIELOS',        'Rompehielos',            'Completa 3 misiones sociales.',                                    'GENERAL', 1, 17, null, 50),
+  ('SOCIABLE',           '¡Sociable!',             'Completa 10 misiones sociales y mantén una racha de 7 días.',      'GENERAL', 2, 18, null, 100),
+  ('ALMA_DE_LA_FIESTA',  '¡¡Alma de la fiesta!!',  'Completa 30 misiones sociales y mantén una racha de 30 días.',     'GENERAL', 3, 19, null, 200),
+  ('ORGANIZADO',         'Organizado',             'Completa 3 misiones de otro tipo.',                                'GENERAL', 1, 20, null, 50),
+  ('PRODUCTIVO',         '¡Productivo!',           'Completa 10 misiones de otro tipo y mantén una racha de 7 días.',  'GENERAL', 2, 21, null, 100),
+  ('MAESTRO_DEL_TIEMPO', '¡¡Maestro del tiempo!!', 'Completa 30 misiones de otro tipo y mantén una racha de 30 días.', 'GENERAL', 3, 22, null, 200),
+  ('ATLETA',             '¡¡Atleta!!',             'Completa 60 misiones físicas.',                                    'FISICO',  3, 23, null, 200),
+  ('TITAN',              '¡¡Titán!!',              'Completa 100 misiones físicas.',                                   'FISICO',  3, 24, null, 200),
+  ('ERUDITO',            '¡¡Erudito!!',            'Completa 60 misiones de estudio.',                                 'ESTUDIO', 3, 25, null, 200),
+  ('GENIO',              '¡¡Genio!!',              'Completa 100 misiones de estudio.',                                'ESTUDIO', 3, 26, null, 200),
+  ('VETERANO',           '¡¡Veterano!!',           'Llega al nivel 50.',                                               'NIVEL',   3, 27, null, 200),
+  ('MAESTRO',            '¡¡Maestro!!',            'Llega al nivel 75.',                                               'NIVEL',   3, 28, null, 200),
+  ('LEYENDA_VIVA',       '¡¡Leyenda viva!!',       'Llega al nivel 100, el máximo.',                                   'NIVEL',   3, 29, null, 200)
 on conflict (id) do update
   set titulo = excluded.titulo, descripcion = excluded.descripcion, familia = excluded.familia,
       nivel = excluded.nivel, orden = excluded.orden, articulo_id = excluded.articulo_id,
@@ -182,7 +207,46 @@ insert into public.logros_requisitos (logro_id, orden, tipo, categoria, logro_re
   ('SENIOR',          2, 'LOGRO',              null,      'JUNIOR',        1),
   ('SABIO',           1, 'MISIONES_CATEGORIA', 'ESTUDIO', null,            30),
   ('SABIO',           2, 'RACHA_DIAS',         null,      null,            30),
-  ('SABIO',           3, 'LOGRO',              null,      'PENSADOR',      1)
+  ('SABIO',           3, 'LOGRO',              null,      'PENSADOR',      1),
+  ('CONSTANTE',          1, 'MISIONES',           null,      null,                 10),
+  ('CONSTANTE',          2, 'LOGRO',              null,      'PRIMEROS_PASOS',     1),
+  ('IMPARABLE',          1, 'MISIONES',           null,      null,                 50),
+  ('IMPARABLE',          2, 'LOGRO',              null,      'CONSTANTE',          1),
+  ('CENTENARIO',         1, 'MISIONES',           null,      null,                 100),
+  ('CENTENARIO',         2, 'LOGRO',              null,      'IMPARABLE',          1),
+  ('EN_RACHA',           1, 'RACHA_DIAS',         null,      null,                 7),
+  ('DISCIPLINADO',       1, 'RACHA_DIAS',         null,      null,                 30),
+  ('DISCIPLINADO',       2, 'LOGRO',              null,      'EN_RACHA',           1),
+  ('INQUEBRANTABLE',     1, 'RACHA_DIAS',         null,      null,                 100),
+  ('INQUEBRANTABLE',     2, 'LOGRO',              null,      'DISCIPLINADO',       1),
+  ('ROMPEHIELOS',        1, 'MISIONES_CATEGORIA', 'SOCIAL',  null,                 3),
+  ('SOCIABLE',           1, 'MISIONES_CATEGORIA', 'SOCIAL',  null,                 10),
+  ('SOCIABLE',           2, 'RACHA_DIAS',         null,      null,                 7),
+  ('SOCIABLE',           3, 'LOGRO',              null,      'ROMPEHIELOS',        1),
+  ('ALMA_DE_LA_FIESTA',  1, 'MISIONES_CATEGORIA', 'SOCIAL',  null,                 30),
+  ('ALMA_DE_LA_FIESTA',  2, 'RACHA_DIAS',         null,      null,                 30),
+  ('ALMA_DE_LA_FIESTA',  3, 'LOGRO',              null,      'SOCIABLE',           1),
+  ('ORGANIZADO',         1, 'MISIONES_CATEGORIA', 'OTRO',    null,                 3),
+  ('PRODUCTIVO',         1, 'MISIONES_CATEGORIA', 'OTRO',    null,                 10),
+  ('PRODUCTIVO',         2, 'RACHA_DIAS',         null,      null,                 7),
+  ('PRODUCTIVO',         3, 'LOGRO',              null,      'ORGANIZADO',         1),
+  ('MAESTRO_DEL_TIEMPO', 1, 'MISIONES_CATEGORIA', 'OTRO',    null,                 30),
+  ('MAESTRO_DEL_TIEMPO', 2, 'RACHA_DIAS',         null,      null,                 30),
+  ('MAESTRO_DEL_TIEMPO', 3, 'LOGRO',              null,      'PRODUCTIVO',         1),
+  ('ATLETA',             1, 'MISIONES_CATEGORIA', 'FISICO',  null,                 60),
+  ('ATLETA',             2, 'LOGRO',              null,      'UNIDAD_ABSOLUTA',    1),
+  ('TITAN',              1, 'MISIONES_CATEGORIA', 'FISICO',  null,                 100),
+  ('TITAN',              2, 'LOGRO',              null,      'ATLETA',             1),
+  ('ERUDITO',            1, 'MISIONES_CATEGORIA', 'ESTUDIO', null,                 60),
+  ('ERUDITO',            2, 'LOGRO',              null,      'SABIO',              1),
+  ('GENIO',              1, 'MISIONES_CATEGORIA', 'ESTUDIO', null,                 100),
+  ('GENIO',              2, 'LOGRO',              null,      'ERUDITO',            1),
+  ('VETERANO',           1, 'NIVEL',              null,      null,                 50),
+  ('VETERANO',           2, 'LOGRO',              null,      'SENIOR',             1),
+  ('MAESTRO',            1, 'NIVEL',              null,      null,                 75),
+  ('MAESTRO',            2, 'LOGRO',              null,      'VETERANO',           1),
+  ('LEYENDA_VIVA',       1, 'NIVEL',              null,      null,                 100),
+  ('LEYENDA_VIVA',       2, 'LOGRO',              null,      'MAESTRO',            1)
 on conflict (logro_id, orden) do update
   set tipo = excluded.tipo, categoria = excluded.categoria, logro_requerido = excluded.logro_requerido,
       objetivo = excluded.objetivo;
@@ -323,11 +387,17 @@ begin
   )
   select b.id, b.titulo, b.descripcion, b.familia, b.nivel, b.orden, b.articulo_id,
          a.nombre, a.espacio, a.calidad, b.obtenido_at, coalesce(b.visto, false), b.requisitos, b.progreso,
-         -- Siguiente medalla de la misma familia ("Avance para el siguiente nivel")
+         -- Siguiente medalla ("Avance para el siguiente nivel"): el logro que pide a este (versión 7)
          s.id, s.progreso, b.esmeraldas
   from base b
   left join public.articulos a on a.id = b.articulo_id
-  left join base s on s.familia = b.familia and s.nivel = b.nivel + 1 and b.familia <> 'GENERAL'
+  left join lateral (
+    select n.id, n.progreso from base n
+    where exists (select 1 from public.logros_requisitos rq
+                  where rq.logro_id = n.id and rq.tipo = 'LOGRO' and rq.logro_requerido = b.id)
+    order by n.orden
+    limit 1
+  ) s on true
   order by b.orden;
 end;
 $$;

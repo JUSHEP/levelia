@@ -59,6 +59,9 @@ import com.levelia.levelia.ui.theme.PressStart2P
  * "Inicio" del diseño: nombre de la skin equipada, la píldora del nivel, la skin grande, el usuario y "Tu
  * progreso". El botón de menú abre "menú" (Cerrar sesión, Perfil, Configuraciones). Recibe estado + lambdas:
  * el nivel y la XP vienen de PerfilViewModel y la skin de PersonalizacionViewModel.
+ *
+ * La pantalla no tiene scroll: la skin ocupa todo el alto que dejan los demás elementos, así se ve grande en
+ * cualquier celular (en uno bajito se achica para que "Tu progreso" siga a la vista).
  */
 @Composable
 fun HomeScreen(
@@ -69,6 +72,8 @@ fun HomeScreen(
     onPerfil: () -> Unit,
     onCerrarSesion: () -> Unit,
     onTab: (TabInferior) -> Unit,
+    /** Solo en cuentas demo (supabase/modo_demo.sql): agrega "Modo demo" al menú. null = cuenta normal. */
+    onModoDemo: (() -> Unit)? = null,
 ) {
     var menuAbierto by rememberSaveable { mutableStateOf(false) }
 
@@ -77,6 +82,7 @@ fun HomeScreen(
         onMenu = { menuAbierto = true },
         espacioSuperior = 50.dp,
         margenHorizontal = MARGEN_PERSONALIZACION,
+        desplazable = false,
         decoracion = { BurbujasDecorativas() },
         barraInferior = {
             BarraInferior(seleccion = TabInferior.INICIO, onTab = onTab, modifier = Modifier.align(Alignment.BottomCenter))
@@ -93,6 +99,12 @@ fun HomeScreen(
                         menuAbierto = false
                         onPerfil()
                     },
+                    onModoDemo = onModoDemo?.let { abrir ->
+                        {
+                            menuAbierto = false
+                            abrir()
+                        }
+                    },
                 )
             }
         },
@@ -108,7 +120,7 @@ fun HomeScreen(
         Spacer(Modifier.height(24.dp))
         ImagenSkin(
             skinId = skin?.id,
-            modifier = Modifier.height(330.dp).align(Alignment.CenterHorizontally),
+            modifier = Modifier.weight(1f),
             descripcion = skin?.nombre ?: NOMBRE_SKIN_INICIAL,
         )
         Spacer(Modifier.height(25.dp))
@@ -144,10 +156,11 @@ private fun PildoraNivel(nivel: Int, modifier: Modifier = Modifier) {
 
 /**
  * "menú" del diseño, sobre el botón que lo abre. "Login" del diseño quedó como "Cerrar sesión" (es lo que
- * hace); "Configuraciones" todavía no tiene pantalla y se ve apagada. Tocar fuera o "atrás" lo cierra.
+ * hace); "Configuraciones" todavía no tiene pantalla y se ve apagada. "Modo demo" solo aparece en las cuentas
+ * demo (no está en el diseño). Tocar fuera o "atrás" lo cierra.
  */
 @Composable
-private fun MenuInicio(onCerrar: () -> Unit, onCerrarSesion: () -> Unit, onPerfil: () -> Unit) {
+private fun MenuInicio(onCerrar: () -> Unit, onCerrarSesion: () -> Unit, onPerfil: () -> Unit, onModoDemo: (() -> Unit)?) {
     BackHandler(onBack = onCerrar)
     Box(
         modifier = Modifier
@@ -180,6 +193,7 @@ private fun MenuInicio(onCerrar: () -> Unit, onCerrarSesion: () -> Unit, onPerfi
             OpcionMenuInicio("Cerrar sesión", onCerrarSesion)
             OpcionMenuInicio("Perfil", onPerfil)
             OpcionMenuInicio("Configuraciones", onClick = null)
+            if (onModoDemo != null) OpcionMenuInicio("Modo demo", onModoDemo)
         }
     }
 }

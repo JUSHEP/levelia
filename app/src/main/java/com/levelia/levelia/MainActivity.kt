@@ -17,6 +17,7 @@ import com.levelia.levelia.presentation.screens.SinConexionScreen
 import com.levelia.levelia.presentation.screens.components.rememberEstadoConexion
 import com.levelia.levelia.presentation.viewmodel.AuthViewModel
 import com.levelia.levelia.presentation.viewmodel.LogrosViewModel
+import com.levelia.levelia.presentation.viewmodel.ModoDemoViewModel
 import com.levelia.levelia.presentation.viewmodel.MisionesViewModel
 import com.levelia.levelia.presentation.viewmodel.PerfilViewModel
 import com.levelia.levelia.presentation.viewmodel.PersonalizacionViewModel
@@ -40,6 +41,7 @@ class MainActivity : ComponentActivity() {
                 val misionesViewModel: MisionesViewModel = hiltViewModel()
                 val logrosViewModel: LogrosViewModel = hiltViewModel()
                 val personalizacionViewModel: PersonalizacionViewModel = hiltViewModel()
+                val modoDemoViewModel: ModoDemoViewModel = hiltViewModel()
 
                 // Sin Scaffold ni padding de barras: el fondo del diseño llega hasta los bordes y cada
                 // pantalla se encarga de dejar libre la barra de estado (ver LeveliaScreen)
@@ -56,6 +58,7 @@ class MainActivity : ComponentActivity() {
                             misionesViewModel = misionesViewModel,
                             logrosViewModel = logrosViewModel,
                             personalizacionViewModel = personalizacionViewModel,
+                            modoDemoViewModel = modoDemoViewModel,
                         )
                         // Sin internet, la pantalla "Sin conexión" tapa la app hasta que vuelva
                         if (!conexion.hayConexion) {
