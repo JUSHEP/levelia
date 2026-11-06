@@ -130,3 +130,16 @@ val LogroBloqueadoInsigniaBorde = Color(0xFF6F5593)
 val LogroRequisitoCumplido = Color(0xFF1FA58A) // "1/1"
 val LogroRequisitoPendiente = Color(0xFF9791A3) // "0/1"
 val LogroFecha = Color(0xFF9A8AB6)
+
+// ---------------------------------------------------------------------------------------------
+// Módulo Personalización e Inicio (valores medidos del diseño del equipo). Las tarjetas, las fichas y el
+// panel "Habilidades" usan PerfilPanelFondo / PerfilPanelBorde, igual que en el diseño.
+// ---------------------------------------------------------------------------------------------
+
+val SkinEquipadaFondo = Color(0xFF287243) // ficha de la skin equipada
+val SkinEquipadaBorde = Color(0xFF00FF00)
+val SkinSilueta = Color(0xFF3A2168) // skin de nivel bloqueada: solo la silueta
+val ContadorFondo = Color(0xFF322B2E) // contador de esmeraldas de arriba a la derecha
+val ContadorBorde = Color(0xFFB8A82F)
+val NivelPildoraFondo = Color(0xFFFFCC00) // "NVL. 10" de Inicio
+val NivelPildoraBorde = Color(0xFFC0913A)

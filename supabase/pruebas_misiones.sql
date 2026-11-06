@@ -25,8 +25,8 @@ begin
     (b, 'Mision_B', 'mision-b@levelia.test', 20, 'AVATAR_2');
 
   -- Curva de niveles (la misma que domain/ReglasNivel.kt)
-  if public.xp_para_subir(1) <> 100 or public.xp_para_subir(2) <> 283 or public.xp_para_subir(99) <> 98504 then
-    raise exception 'FALLO: xp_para_subir no da 100 / 283 / 98504';
+  if public.xp_para_subir(1) <> 100 or public.xp_para_subir(2) <> 110 or public.xp_para_subir(99) <> 1080 then
+    raise exception 'FALLO: xp_para_subir no da 100 / 110 / 1080';
   end if;
 
   select id into gym from public.misiones where user_id is null and titulo = 'Ir al gym';
@@ -180,7 +180,7 @@ begin
 
   -- 8) Subir varios niveles de una vez y tope en 100
   reset role;
-  update public.progreso set nivel = 99, xp = 98500 where user_id = a;
+  update public.progreso set nivel = 99, xp = 1000 where user_id = a;
   update public.misiones_usuario set estado = 'COMPLETADA', fecha_limite = public.hoy() - 1 where id = mu.id;
   set local role authenticated;
   -- 8a) Con la XP sin reclamar no se puede repetir (aunque ya pasó su semana)
@@ -188,7 +188,8 @@ begin
   begin perform public.aceptar_mision(gym); exception when others then fallo := sqlerrm = 'RECOMPENSA_PENDIENTE'; end;
   if not fallo then raise exception 'FALLO: repitió una misión con la recompensa sin reclamar'; end if;
   select * into r from public.reclamar_recompensas();
-  if r.nivel <> 100 or r.xp <> 146 then raise exception 'FALLO: tope de nivel (nivel %, xp %)', r.nivel, r.xp; end if;
+  -- 1000 + 150 = 1150: pasa al 100 (el 99 pide 1080) y le sobran 70
+  if r.nivel <> 100 or r.xp <> 70 then raise exception 'FALLO: tope de nivel (nivel %, xp %)', r.nivel, r.xp; end if;
   -- 8b) Reclamada y con su semana terminada: se puede volver a aceptar
   mu := public.aceptar_mision(gym);
   if mu.estado <> 'ACTIVA' then raise exception 'FALLO: no dejó repetir tras su semana'; end if;

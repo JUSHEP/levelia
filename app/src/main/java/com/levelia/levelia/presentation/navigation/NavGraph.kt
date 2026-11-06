@@ -23,6 +23,7 @@ import androidx.navigation.navArgument
 import com.levelia.levelia.domain.ReglasPerfil
 import com.levelia.levelia.domain.models.Destinations
 import com.levelia.levelia.domain.models.EstadoMision
+import com.levelia.levelia.domain.models.NIVELES_DEMO_POR_DEFECTO
 import com.levelia.levelia.domain.models.TipoDialogoPerfil
 import com.levelia.levelia.ui.theme.BotonGuardar
 import com.levelia.levelia.presentation.screens.CambiarAvatarScreen
@@ -33,12 +34,15 @@ import com.levelia.levelia.presentation.screens.AjustarDificultadScreen
 import com.levelia.levelia.presentation.screens.CuentaEliminadaScreen
 import com.levelia.levelia.presentation.screens.DetallesLogroScreen
 import com.levelia.levelia.presentation.screens.DetallesMisionScreen
+import com.levelia.levelia.presentation.screens.DetallesSkinScreen
 import com.levelia.levelia.presentation.screens.EditarNombreScreen
 import com.levelia.levelia.presentation.screens.HomeScreen
 import com.levelia.levelia.presentation.screens.LoginScreen
 import com.levelia.levelia.presentation.screens.LogrosScreen
 import com.levelia.levelia.presentation.screens.MisionesScreen
+import com.levelia.levelia.presentation.screens.ModoDemoScreen
 import com.levelia.levelia.presentation.screens.PerfilScreen
+import com.levelia.levelia.presentation.screens.PersonalizacionScreen
 import com.levelia.levelia.presentation.screens.RecoverPasswordScreen
 import com.levelia.levelia.presentation.screens.RestablecerContrasenaScreen
 import com.levelia.levelia.presentation.screens.RegisterStep1Screen
@@ -48,11 +52,14 @@ import com.levelia.levelia.presentation.screens.RegisterStep4Screen
 import com.levelia.levelia.presentation.screens.components.LeveliaBackground
 import com.levelia.levelia.presentation.screens.components.LeveliaDialog
 import com.levelia.levelia.presentation.screens.components.recurso
+import com.levelia.levelia.presentation.screens.components.recursoSkin
 import com.levelia.levelia.presentation.screens.components.TabInferior
 import com.levelia.levelia.presentation.viewmodel.AuthViewModel
 import com.levelia.levelia.presentation.viewmodel.LogrosViewModel
 import com.levelia.levelia.presentation.viewmodel.MisionesViewModel
+import com.levelia.levelia.presentation.viewmodel.ModoDemoViewModel
 import com.levelia.levelia.presentation.viewmodel.PerfilViewModel
+import com.levelia.levelia.presentation.viewmodel.PersonalizacionViewModel
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 
@@ -79,10 +86,14 @@ private val RUTAS_PROTEGIDAS = listOf(
     Destinations.AjustarDificultadScreen.route,
     Destinations.LogrosScreen.route,
     Destinations.DetallesLogroScreen.route,
+    Destinations.PersonalizacionScreen.route,
+    Destinations.DetallesSkinScreen.route,
+    Destinations.ModoDemoScreen.route,
 )
 
 /**
- * [authViewModel], [perfilViewModel], [misionesViewModel] y [logrosViewModel] deben crearse fuera del NavHost (ver MainActivity): si cada
+ * Los ViewModels ([authViewModel], [perfilViewModel], [misionesViewModel], [logrosViewModel],
+ * [personalizacionViewModel] y [modoDemoViewModel]) deben crearse fuera del NavHost (ver MainActivity): si cada
  * destino llamara a hiltViewModel() tendría su propia instancia y el estado se perdería entre pantallas.
  */
 @Composable
@@ -91,6 +102,8 @@ fun NavGraph(
     perfilViewModel: PerfilViewModel,
     misionesViewModel: MisionesViewModel,
     logrosViewModel: LogrosViewModel,
+    personalizacionViewModel: PersonalizacionViewModel,
+    modoDemoViewModel: ModoDemoViewModel,
     modifier: Modifier = Modifier,
     navController: NavHostController = rememberNavController(),
 ) {
@@ -99,7 +112,10 @@ fun NavGraph(
     if (restaurando) {
         LeveliaBackground {}
     } else {
-        NavGraphContenido(authViewModel, perfilViewModel, misionesViewModel, logrosViewModel, modifier, navController)
+        NavGraphContenido(
+            authViewModel, perfilViewModel, misionesViewModel, logrosViewModel, personalizacionViewModel, modoDemoViewModel,
+            modifier, navController,
+        )
     }
 }
 
@@ -109,6 +125,8 @@ private fun NavGraphContenido(
     perfilViewModel: PerfilViewModel,
     misionesViewModel: MisionesViewModel,
     logrosViewModel: LogrosViewModel,
+    personalizacionViewModel: PersonalizacionViewModel,
+    modoDemoViewModel: ModoDemoViewModel,
     modifier: Modifier,
     navController: NavHostController,
 ) {
@@ -143,9 +161,13 @@ private fun NavGraphContenido(
                 perfilViewModel.limpiar()
                 misionesViewModel.limpiar()
                 logrosViewModel.limpiar()
+                personalizacionViewModel.limpiar()
+                modoDemoViewModel.limpiar()
             } else {
-                // Para avisar los logros que se ganaron y aún no se mostraron
+                // Para avisar los logros y las skins que se ganaron y aún no se mostraron
                 logrosViewModel.cargar()
+                personalizacionViewModel.cargar()
+                modoDemoViewModel.cargar()
             }
             val rutaActual = navController.currentDestination?.route ?: return@collect
             if (autenticado && rutaActual != Destinations.HomeScreen.route) {
@@ -178,17 +200,41 @@ private fun NavGraphContenido(
         }
     }
 
-    // Reclamar XP puede subir de nivel y desbloquear logros: se releen cuando llega la recompensa
-    LaunchedEffect(misionesViewModel, logrosViewModel) {
+    // Reclamar XP puede subir de nivel, desbloquear logros y skins, y da esmeraldas: se releen cuando llega la recompensa
+    LaunchedEffect(misionesViewModel, logrosViewModel, personalizacionViewModel) {
         misionesViewModel.estado
             .map { it.recompensa }
             .distinctUntilChanged()
-            .collect { if (it != null) logrosViewModel.cargar() }
+            .collect {
+                if (it != null) {
+                    logrosViewModel.cargar()
+                    personalizacionViewModel.cargar()
+                }
+            }
+    }
+
+    // El modo demo cambia en el servidor el nivel, las fechas, los logros y las skins: se relee todo (y así salen
+    // los avisos de logro y de skin, igual que al reclamar)
+    LaunchedEffect(modoDemoViewModel) {
+        modoDemoViewModel.estado
+            .map { it.cambios }
+            .distinctUntilChanged()
+            .collect { cambios ->
+                if (cambios > 0) {
+                    perfilViewModel.cargarPerfil(authViewModel.user.value)
+                    misionesViewModel.cargar()
+                    logrosViewModel.cargar()
+                    personalizacionViewModel.cargar()
+                }
+            }
     }
 
     val logros by logrosViewModel.estado.collectAsStateWithLifecycle()
     // Solo si hay aviso de recompensa abierto (no toda la lista: así el grafo no se recompone con cada cambio)
     val hayRecompensa by remember { misionesViewModel.estado.map { it.recompensa != null } }.collectAsStateWithLifecycle(false)
+    // Lo mismo con las skins: solo las recién desbloqueadas, para "¡Skin desbloqueada!"
+    val skinsNuevas by remember { personalizacionViewModel.estado.map { it.nuevas }.distinctUntilChanged() }
+        .collectAsStateWithLifecycle(emptyList())
 
     Box(modifier = modifier.fillMaxSize()) {
         NavHost(
@@ -345,9 +391,58 @@ private fun NavGraphContenido(
 
             composable(Destinations.HomeScreen.route) {
                 val user by authViewModel.user.collectAsStateWithLifecycle()
+                val perfil by perfilViewModel.perfil.collectAsStateWithLifecycle()
+                val personalizacion by personalizacionViewModel.estado.collectAsStateWithLifecycle()
+                val demo by modoDemoViewModel.estado.collectAsStateWithLifecycle()
+
+                // Nivel, XP y skin equipada: se vuelven a leer de la base cada vez que se abre Inicio
+                LaunchedEffect(Unit) {
+                    perfilViewModel.cargarPerfil(user)
+                    personalizacionViewModel.cargar()
+                    modoDemoViewModel.cargar()
+                }
+
                 HomeScreen(
-                    user = user,
-                    onLogout = authViewModel::logout,
+                    nombreUsuario = perfil.usuario?.nombre ?: user?.nombre.orEmpty(),
+                    progreso = perfil.progreso,
+                    skin = personalizacion.equipada,
+                    onPerfil = { navController.irATab(TabInferior.PERFIL) },
+                    onCerrarSesion = authViewModel::logout,
+                    onTab = { navController.irATab(it) },
+                    onModoDemo = if (demo.activo) ({ navController.navigate(Destinations.ModoDemoScreen.route) }) else null,
+                )
+            }
+
+            // ------------------------------ Modo demo (supabase/modo_demo.sql) ------------------------------
+
+            composable(Destinations.ModoDemoScreen.route) {
+                val user by authViewModel.user.collectAsStateWithLifecycle()
+                val demo by modoDemoViewModel.estado.collectAsStateWithLifecycle()
+                val perfil by perfilViewModel.perfil.collectAsStateWithLifecycle()
+                val personalizacion by personalizacionViewModel.estado.collectAsStateWithLifecycle()
+
+                LaunchedEffect(Unit) {
+                    modoDemoViewModel.cargar()
+                    perfilViewModel.cargarPerfil(user)
+                    personalizacionViewModel.cargar()
+                }
+
+                ModoDemoScreen(
+                    estado = demo,
+                    progreso = perfil.progreso,
+                    esmeraldas = personalizacion.esmeraldas,
+                    // Los niveles de las skins del guerrero (sin la inicial)
+                    niveles = personalizacion.deNivel.mapNotNull { it.nivelRequerido }.filter { it > 1 }
+                        .ifEmpty { NIVELES_DEMO_POR_DEFECTO },
+                    onBack = { navController.popBackStack() },
+                    onAvanzarDia = modoDemoViewModel::avanzarDia,
+                    onPrepararNivel = modoDemoViewModel::prepararNivel,
+                    onSubirNivel = modoDemoViewModel::subirNivel,
+                    onSumarEsmeraldas = modoDemoViewModel::sumarEsmeraldas,
+                    onReiniciar = modoDemoViewModel::pedirReinicio,
+                    onConfirmarReinicio = modoDemoViewModel::confirmarReinicio,
+                    onCancelarConfirmacion = modoDemoViewModel::cancelarConfirmacion,
+                    onCerrarError = modoDemoViewModel::cerrarError,
                     onTab = { navController.irATab(it) },
                 )
             }
@@ -493,6 +588,46 @@ private fun NavGraphContenido(
                 }
             }
 
+            // ---------------------------- Módulo Personalización ----------------------------
+
+            composable(Destinations.PersonalizacionScreen.route) {
+                val estado by personalizacionViewModel.estado.collectAsStateWithLifecycle()
+
+                // Cada vez que se abre se vuelve a leer (antes el servidor paga las esmeraldas pendientes)
+                LaunchedEffect(Unit) { personalizacionViewModel.cargar() }
+
+                PersonalizacionScreen(
+                    estado = estado,
+                    onBack = { navController.popBackStack() },
+                    onSkin = { navController.navigate(Destinations.DetallesSkinScreen.conId(it.id)) },
+                    onCerrarError = personalizacionViewModel::cerrarAviso,
+                    onTab = { navController.irATab(it) },
+                )
+            }
+
+            composable(
+                route = Destinations.DetallesSkinScreen.route,
+                arguments = listOf(navArgument("skinId") { type = NavType.StringType }),
+            ) { entrada ->
+                val skinId = entrada.arguments?.getString("skinId").orEmpty()
+                val estado by personalizacionViewModel.estado.collectAsStateWithLifecycle()
+                val skin = estado.skins.firstOrNull { it.id == skinId }
+                if (skin == null) {
+                    LaunchedEffect(Unit) { navController.popBackStack() }
+                } else {
+                    DetallesSkinScreen(
+                        skin = skin,
+                        estado = estado,
+                        onBack = { navController.popBackStack() },
+                        onEquipar = { personalizacionViewModel.equipar(skin.id) },
+                        onComprar = { personalizacionViewModel.pedirCompra(skin.id) },
+                        onConfirmarCompra = personalizacionViewModel::confirmarCompra,
+                        onCerrarAviso = personalizacionViewModel::cerrarAviso,
+                        onTab = { navController.irATab(it) },
+                    )
+                }
+            }
+
             // ------------------------------- Módulo Perfil -------------------------------
 
             composable(Destinations.PerfilScreen.route) {
@@ -589,31 +724,54 @@ private fun NavGraphContenido(
             }
         }
 
-        // "¡Logro desbloqueado!" encima de cualquier pantalla, después del aviso de la recompensa si lo hay.
-        // Textos provisionales: el diseño no trae este aviso (confirmar con el equipo).
+        // "¡Logro desbloqueado!" encima de cualquier pantalla, después del aviso de la recompensa si lo hay, y
+        // después "¡Skin desbloqueada!". Textos provisionales: el diseño no trae estos avisos (confirmar con el equipo).
         val nuevos = logros.nuevos
         if (nuevos.isNotEmpty() && !hayRecompensa) {
             LeveliaDialog(
                 titulo = if (nuevos.size == 1) "¡Logro desbloqueado!" else "¡Logros desbloqueados!",
-                mensaje = nuevos.joinToString("\n") { l -> l.titulo + (l.articulo?.let { " · Obtuviste: ${it.nombre}" } ?: "") },
+                mensaje = nuevos.joinToString("\n") { l ->
+                    l.titulo + if (l.esmeraldas > 0) {
+                        " · +${l.esmeraldas} esmeraldas"
+                    } else {
+                        // Base de datos sin actualizar a logros.sql versión 6 (todavía entrega piezas)
+                        l.articulo?.let { " · Obtuviste: ${it.nombre}" }.orEmpty()
+                    }
+                },
                 icono = nuevos.first().recurso(),
                 onEntendido = logrosViewModel::cerrarNuevos,
                 textoBoton = "Aceptar",
                 altoIcono = 72.dp,
                 colorBoton = BotonGuardar,
             )
+        } else if (skinsNuevas.isNotEmpty() && !hayRecompensa) {
+            val primera = skinsNuevas.first()
+            val nombres = skinsNuevas.map { it.nombre }
+            LeveliaDialog(
+                titulo = if (nombres.size == 1) "¡Skin desbloqueada!" else "¡Skins desbloqueadas!",
+                mensaje = if (nombres.size == 1) {
+                    "Llegaste al nivel ${primera.nivelRequerido ?: 1}. Ya puedes equipar a ${primera.nombre} en Personalización."
+                } else {
+                    "Ya puedes equipar a ${nombres.dropLast(1).joinToString(", ")} y ${nombres.last()} en Personalización."
+                },
+                icono = recursoSkin(primera.id),
+                onEntendido = personalizacionViewModel::cerrarNuevas,
+                textoBoton = "Aceptar",
+                altoIcono = 96.dp,
+                colorBoton = BotonGuardar,
+            )
         }
     }
 }
 
-/** Barra inferior: Personalización todavía no tiene pantalla y no hace nada. */
+/** Barra inferior: las 5 pestañas abren su pantalla (volver atrás siempre lleva a Inicio). */
 private fun NavHostController.irATab(tab: TabInferior) {
     val destino = when (tab) {
         TabInferior.MISIONES -> Destinations.MisionesScreen.route
         TabInferior.LOGROS -> Destinations.LogrosScreen.route
         TabInferior.INICIO -> Destinations.HomeScreen.route
+        TabInferior.PERSONALIZACION -> Destinations.PersonalizacionScreen.route
         TabInferior.PERFIL -> Destinations.PerfilScreen.route
-        else -> return
     }
     if (currentDestination?.route == destino) return
     navigate(destino) {

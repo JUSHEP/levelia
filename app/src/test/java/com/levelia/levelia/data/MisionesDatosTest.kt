@@ -69,9 +69,18 @@ class MisionesDatosTest {
     fun `curva de niveles igual a la del servidor`() {
         // Mismos valores que prueba supabase/pruebas_misiones.sql con xp_para_subir()
         assertEquals(100, ReglasNivel.xpParaSubir(1))
-        assertEquals(283, ReglasNivel.xpParaSubir(2))
-        assertEquals(98_504, ReglasNivel.xpParaSubir(99))
+        assertEquals(110, ReglasNivel.xpParaSubir(2))
+        assertEquals(1_080, ReglasNivel.xpParaSubir(99))
         assertTrue((1 until ReglasNivel.NIVEL_MAX).all { ReglasNivel.xpParaSubir(it) < ReglasNivel.xpParaSubir(it + 1) })
+    }
+
+    @Test
+    fun `el nivel 100 se puede alcanzar`() {
+        // Con la curva vieja (100 · n^1.5) hacían falta 3 950 120 XP; con la nueva, 58 410 (≈195 misiones difíciles)
+        assertEquals(460, ReglasNivel.xpTotalHasta(5))
+        assertEquals(5_160, ReglasNivel.xpTotalHasta(25))
+        assertEquals(58_410, ReglasNivel.xpTotalHasta(100))
+        assertEquals(0, ReglasNivel.xpTotalHasta(1))
     }
 
     @Test

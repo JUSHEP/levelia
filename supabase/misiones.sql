@@ -1,8 +1,9 @@
 -- =============================================================================
--- Levelia · módulo Misiones (versión 3). Se corre DESPUÉS del esquema del Perfil.
+-- Levelia · módulo Misiones (versión 5). Se corre DESPUÉS del esquema del Perfil.
 --
 -- Cómo usarlo: Supabase → SQL Editor → pegar TODO → Run. Es idempotente.
 -- Pruebas: supabase/pruebas_misiones.sql (debe terminar con un error que dice PRUEBAS_OK).
+-- Versión 5 (2026-11-05): curva de niveles más suave (ver Reglas) y 24 misiones predefinidas más.
 --
 -- Qué crea:
 --   misiones           catálogo: las predefinidas (user_id null) y las que crea cada usuario
@@ -16,13 +17,14 @@
 --   vencer_mis_misiones() marca como perdidas las que pasaron su fecha límite
 --   reclamar_recompensas() "¡Reclamar recompensa!": suma la XP y sube de nivel
 --
--- Reglas (acordadas con el equipo el 2026-10-21):
+-- Reglas (acordadas con el equipo el 2026-10-21; curva de niveles cambiada el 2026-11-05):
 --   - Dificultades: FACIL 1 vez/semana +75 XP, MEDIA 3 +150, DIFICIL 5 +300, UNICA 1 +50.
 --   - Por veces: máximo 1 registro por día y 7 días desde que se acepta; si no llega, PERDIDA.
 --     Se puede volver a aceptar cuando terminan esos 7 días y su XP ya se reclamó (UNICA, una sola vez).
 --   - UNICA: tiene fecha límite; registrar progreso hasta esa fecha la cumple, después queda PERDIDA.
 --   - La XP se suma al reclamar, no al cumplir.
---   - Nivel n → n+1 pide round(100 · n^1.5) XP (100, 283, 520 … ≈98 500 del 99 al 100). Máximo nivel 100.
+--   - Nivel n → n+1 pide 100 + 10·(n − 1) XP (100, 110, 120 … 1 080 del 99 al 100): unos 58 400 XP para
+--     llegar al nivel 100, el máximo. Hasta el 2026-11-05 era round(100 · n^1.5), que pedía casi 4 millones.
 --     La misma fórmula está en la app (domain/ReglasNivel.kt): si se cambia una, cambiar la otra.
 --
 -- La app solo LEE estas tablas; todo cambio pasa por las funciones (security definer).
@@ -46,7 +48,7 @@ returns integer
 language sql
 immutable
 set search_path = ''
-as $$ select round(100 * power(greatest(p_nivel, 1)::numeric, 1.5))::integer $$;
+as $$ select 100 + 10 * (greatest(p_nivel, 1) - 1) $$;
 
 grant execute on function public.hoy() to authenticated;
 grant execute on function public.xp_para_subir(integer) to anon, authenticated;
@@ -86,13 +88,43 @@ create policy "misiones_select_visibles"
   on public.misiones for select to authenticated
   using (user_id is null or user_id = (select auth.uid()));
 
--- Misiones predefinidas (las del diseño). Se pueden editar aquí y volver a correr el archivo: se actualizan
--- (las ya aceptadas conservan los valores con que se aceptaron).
+-- Misiones predefinidas. Las 4 primeras son las del diseño; las demás (versión 5) usan las veces y XP de su
+-- dificultad. El ícono decide la categoría de los logros: PESA físico, CEREBRO estudio, PERSONAS social y
+-- PORTAPAPELES otro tipo. Se pueden editar aquí y volver a correr el archivo: se actualizan (las ya aceptadas
+-- conservan los valores con que se aceptaron).
 insert into public.misiones (titulo, descripcion, icono, dificultad, meta, xp) values
-  ('Ir al gym',          'Mejora tu estado físico.', 'PESA',         'MEDIA', 3, 150),
-  ('A clases',           'Asiste a la universidad.',                            'CEREBRO',      'MEDIA', 2, 100),
-  ('Modo enfoque',       'Estudia 2 horas.',                                    'PORTAPAPELES', 'FACIL', 2, 75),
-  ('Sígueme y te sigo',  'Interactúa con 3 extraños.',                          'PERSONAS',     'MEDIA', 3, 100)
+  ('Ir al gym',           'Mejora tu estado físico.',                             'PESA',         'MEDIA',   3, 150),
+  ('A clases',            'Asiste a la universidad.',                             'CEREBRO',      'MEDIA',   2, 100),
+  ('Modo enfoque',        'Estudia 2 horas.',                                     'PORTAPAPELES', 'FACIL',   2, 75),
+  ('Sígueme y te sigo',   'Interactúa con 3 extraños.',                           'PERSONAS',     'MEDIA',   3, 100),
+  -- Físicas
+  ('Salir a caminar',     'Camina 30 minutos.',                                   'PESA',         'FACIL',   1, 75),
+  ('Estiramientos',       'Estira 10 minutos al despertar.',                      'PESA',         'DIFICIL', 5, 300),
+  ('A correr',            'Corre al menos 2 km.',                                 'PESA',         'MEDIA',   3, 150),
+  ('Sin ascensor',        'Usa las escaleras en vez del ascensor.',               'PESA',         'MEDIA',   3, 150),
+  ('Rutina en casa',      'Haz 20 minutos de ejercicio en casa.',                 'PESA',         'MEDIA',   3, 150),
+  ('Hidrátate',           'Toma 2 litros de agua en el día.',                     'PESA',         'DIFICIL', 5, 300),
+  -- De estudio
+  ('Lectura diaria',      'Lee 20 páginas de un libro.',                          'CEREBRO',      'MEDIA',   3, 150),
+  ('Repaso de apuntes',   'Repasa lo que viste hoy en clase.',                    'CEREBRO',      'DIFICIL', 5, 300),
+  ('Practica un idioma',  'Practica otro idioma 15 minutos.',                     'CEREBRO',      'DIFICIL', 5, 300),
+  ('Tareas al día',       'Entrega todas las tareas de la semana.',               'CEREBRO',      'FACIL',   1, 75),
+  ('Aprende algo nuevo',  'Mira un video o un curso corto sobre un tema nuevo.',  'CEREBRO',      'MEDIA',   3, 150),
+  ('Prepara el parcial',  'Estudia 1 hora para tu próximo examen.',               'CEREBRO',      'MEDIA',   3, 150),
+  -- Sociales
+  ('Llama a alguien',     'Llama a un familiar o a un amigo.',                    'PERSONAS',     'FACIL',   1, 75),
+  ('Comida sin celular',  'Come acompañado y sin mirar el celular.',              'PERSONAS',     'MEDIA',   3, 150),
+  ('Haz un favor',        'Ayuda a alguien sin que te lo pida.',                  'PERSONAS',     'MEDIA',   3, 150),
+  ('Rompe el hielo',      'Habla con un compañero con el que nunca has hablado.', 'PERSONAS',     'FACIL',   1, 75),
+  ('Plan con amigos',     'Organiza una salida o un juego con tus amigos.',       'PERSONAS',     'FACIL',   1, 75),
+  ('Da las gracias',      'Agradécele a alguien algo concreto.',                  'PERSONAS',     'DIFICIL', 5, 300),
+  -- Otro tipo (hábitos y organización)
+  ('Tiende la cama',      'Tiende tu cama al levantarte.',                        'PORTAPAPELES', 'DIFICIL', 5, 300),
+  ('Ordena tu espacio',   'Organiza tu escritorio o tu cuarto.',                  'PORTAPAPELES', 'FACIL',   1, 75),
+  ('Planea tu semana',    'Escribe tus pendientes de la semana.',                 'PORTAPAPELES', 'FACIL',   1, 75),
+  ('Menos pantalla',      'Usa el celular menos de 3 horas en el día.',           'PORTAPAPELES', 'MEDIA',   3, 150),
+  ('Dormir temprano',     'Acuéstate antes de las 11 p. m.',                      'PORTAPAPELES', 'DIFICIL', 5, 300),
+  ('Cero gastos hormiga', 'Pasa el día sin compras innecesarias.',                'PORTAPAPELES', 'MEDIA',   3, 150)
 on conflict (titulo) where user_id is null do update
   set descripcion = excluded.descripcion, icono = excluded.icono, dificultad = excluded.dificultad,
       meta = excluded.meta, xp = excluded.xp;
@@ -482,3 +514,26 @@ grant execute on function public.crear_mision(text, text, text, date) to authent
 grant execute on function public.aceptar_mision(bigint, text) to authenticated;
 grant execute on function public.registrar_progreso(bigint) to authenticated;
 grant execute on function public.reclamar_recompensas() to authenticated;
+
+-- -----------------------------------------------------------------------------
+-- 4. Curva nueva (2026-11-05): cada nivel pide menos XP que antes, así que quien ya tenía más XP de la que pide
+--    su nivel sube ahora, igual que al reclamar. Si ya está al día no cambia nada (se puede volver a correr).
+-- -----------------------------------------------------------------------------
+do $$
+declare
+  r       record;
+  v_nivel integer;
+  v_xp    integer;
+begin
+  for r in select p.user_id, p.nivel, p.xp from public.progreso p
+            where p.nivel < 100 and p.xp >= public.xp_para_subir(p.nivel) loop
+    v_nivel := r.nivel;
+    v_xp := r.xp;
+    while v_nivel < 100 and v_xp >= public.xp_para_subir(v_nivel) loop
+      v_xp := v_xp - public.xp_para_subir(v_nivel);
+      v_nivel := v_nivel + 1;
+    end loop;
+    update public.progreso set nivel = v_nivel, xp = v_xp where user_id = r.user_id;
+  end loop;
+end
+$$;

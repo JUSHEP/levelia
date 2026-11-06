@@ -1,112 +1,216 @@
 package com.levelia.levelia.presentation.screens
 
-import androidx.compose.foundation.BorderStroke
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Logout
-import androidx.compose.material.icons.filled.Face
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.levelia.levelia.domain.models.Avatar
-import com.levelia.levelia.domain.models.UserData
-import com.levelia.levelia.presentation.screens.components.ALTO_BARRA_INFERIOR
-import com.levelia.levelia.presentation.screens.components.AuthColumn
+import androidx.compose.ui.unit.sp
+import com.levelia.levelia.domain.models.NOMBRE_SKIN_INICIAL
+import com.levelia.levelia.domain.models.ProgresoData
+import com.levelia.levelia.domain.models.Skin
 import com.levelia.levelia.presentation.screens.components.BarraInferior
+import com.levelia.levelia.presentation.screens.components.BurbujasDecorativas
+import com.levelia.levelia.presentation.screens.components.ImagenSkin
+import com.levelia.levelia.presentation.screens.components.LeveliaScreen
+import com.levelia.levelia.presentation.screens.components.MARGEN_PERSONALIZACION
+import com.levelia.levelia.presentation.screens.components.PieDePantalla
 import com.levelia.levelia.presentation.screens.components.TabInferior
-import com.levelia.levelia.ui.theme.MoradoAcento
-import com.levelia.levelia.ui.theme.TextoSecundario
+import com.levelia.levelia.presentation.screens.components.TarjetaProgreso
+import com.levelia.levelia.presentation.screens.components.TituloPixel
+import com.levelia.levelia.ui.theme.NivelPildoraBorde
+import com.levelia.levelia.ui.theme.NivelPildoraFondo
+import com.levelia.levelia.ui.theme.PerfilPanelBorde
+import com.levelia.levelia.ui.theme.PerfilPanelFondo
+import com.levelia.levelia.ui.theme.PlusJakartaSans
+import com.levelia.levelia.ui.theme.PressStart2P
 
+/**
+ * "Inicio" del diseño: nombre de la skin equipada, la píldora del nivel, la skin grande, el usuario y "Tu
+ * progreso". El botón de menú abre "menú" (Cerrar sesión, Perfil, Configuraciones). Recibe estado + lambdas:
+ * el nivel y la XP vienen de PerfilViewModel y la skin de PersonalizacionViewModel.
+ *
+ * La pantalla no tiene scroll: la skin ocupa todo el alto que dejan los demás elementos, así se ve grande en
+ * cualquier celular (en uno bajito se achica para que "Tu progreso" siga a la vista).
+ */
 @Composable
-fun HomeScreen(user: UserData?, onLogout: () -> Unit, onTab: (TabInferior) -> Unit) {
-    Box(modifier = Modifier.fillMaxSize()) {
-        AuthColumn(title = "¡Hola${user?.nombre?.let { ", $it" }.orEmpty()}!") {
-            if (user != null) {
-                TarjetaUsuario(user)
-            }
-            OutlinedButton(
-                onClick = onLogout,
-                shape = RoundedCornerShape(12.dp),
-                border = BorderStroke(1.dp, MoradoAcento),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = MoradoAcento),
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = null, modifier = Modifier.size(18.dp))
-                Text("Cerrar sesión", modifier = Modifier.padding(start = 8.dp))
-            }
-            // Espacio para que la barra inferior no tape el botón
-            Spacer(Modifier.height(ALTO_BARRA_INFERIOR))
-        }
-        BarraInferior(
-            seleccion = TabInferior.INICIO,
-            onTab = onTab,
-            modifier = Modifier.align(Alignment.BottomCenter),
-        )
-    }
-}
+fun HomeScreen(
+    nombreUsuario: String,
+    progreso: ProgresoData,
+    /** La skin equipada; null = todavía no llegó (se dibuja la inicial). */
+    skin: Skin?,
+    onPerfil: () -> Unit,
+    onCerrarSesion: () -> Unit,
+    onTab: (TabInferior) -> Unit,
+    /** Solo en cuentas demo (supabase/modo_demo.sql): agrega "Modo demo" al menú. null = cuenta normal. */
+    onModoDemo: (() -> Unit)? = null,
+) {
+    var menuAbierto by rememberSaveable { mutableStateOf(false) }
 
-@Composable
-private fun TarjetaUsuario(user: UserData) {
-    val avatar = Avatar.entries.firstOrNull { it.name == user.avatar }
-    val colorAvatar = avatar?.color() ?: MoradoAcento
-
-    Card(
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        modifier = Modifier.fillMaxWidth(),
+    LeveliaScreen(
+        pie = PieDePantalla.NINGUNO,
+        onMenu = { menuAbierto = true },
+        espacioSuperior = 50.dp,
+        margenHorizontal = MARGEN_PERSONALIZACION,
+        desplazable = false,
+        decoracion = { BurbujasDecorativas() },
+        barraInferior = {
+            BarraInferior(seleccion = TabInferior.INICIO, onTab = onTab, modifier = Modifier.align(Alignment.BottomCenter))
+        },
+        overlay = {
+            if (menuAbierto) {
+                MenuInicio(
+                    onCerrar = { menuAbierto = false },
+                    onCerrarSesion = {
+                        menuAbierto = false
+                        onCerrarSesion()
+                    },
+                    onPerfil = {
+                        menuAbierto = false
+                        onPerfil()
+                    },
+                    onModoDemo = onModoDemo?.let { abrir ->
+                        {
+                            menuAbierto = false
+                            abrir()
+                        }
+                    },
+                )
+            }
+        },
     ) {
-        Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                if (avatar != null) {
-                    AvatarImagen(avatar, modifier = Modifier.size(64.dp))
-                } else {
-                    Surface(
-                        shape = CircleShape,
-                        color = colorAvatar.copy(alpha = 0.2f),
-                        border = BorderStroke(3.dp, colorAvatar),
-                        modifier = Modifier.size(64.dp),
-                    ) {
-                        Icon(Icons.Filled.Face, contentDescription = null, tint = colorAvatar, modifier = Modifier.padding(12.dp))
-                    }
-                }
-                Column(modifier = Modifier.padding(start = 16.dp)) {
-                    Text(user.nombre, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                    Text(avatar?.etiqueta() ?: user.avatar, color = colorAvatar)
-                }
-            }
-            HorizontalDivider(color = TextoSecundario.copy(alpha = 0.3f))
-            DatoUsuario("Email", user.email)
-            DatoUsuario("Edad", "${user.edad} años")
+        TituloPixel(
+            (skin?.nombre ?: NOMBRE_SKIN_INICIAL).uppercase(),
+            tamano = 31.sp,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Spacer(Modifier.height(17.dp))
+        PildoraNivel(progreso.nivel, Modifier.align(Alignment.CenterHorizontally))
+        Spacer(Modifier.height(24.dp))
+        ImagenSkin(
+            skinId = skin?.id,
+            modifier = Modifier.weight(1f),
+            descripcion = skin?.nombre ?: NOMBRE_SKIN_INICIAL,
+        )
+        Spacer(Modifier.height(25.dp))
+        Text(
+            if (nombreUsuario.isBlank()) "" else "@$nombreUsuario",
+            color = Color.White,
+            fontFamily = PressStart2P,
+            fontSize = 16.sp,
+            textAlign = TextAlign.Center,
+            maxLines = 1,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Spacer(Modifier.height(28.dp))
+        TarjetaProgreso(progreso)
+    }
+}
+
+/** "NVL. 10" amarillo bajo el nombre de la skin. */
+@Composable
+private fun PildoraNivel(nivel: Int, modifier: Modifier = Modifier) {
+    val forma = RoundedCornerShape(50)
+    Box(
+        modifier = modifier
+            .size(width = 200.dp, height = 46.dp)
+            .clip(forma)
+            .background(NivelPildoraFondo)
+            .border(2.dp, NivelPildoraBorde, forma),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text("NVL. $nivel", color = Color.White, fontFamily = PressStart2P, fontSize = 14.sp, maxLines = 1)
+    }
+}
+
+/**
+ * "menú" del diseño, sobre el botón que lo abre. "Login" del diseño quedó como "Cerrar sesión" (es lo que
+ * hace); "Configuraciones" todavía no tiene pantalla y se ve apagada. "Modo demo" solo aparece en las cuentas
+ * demo (no está en el diseño). Tocar fuera o "atrás" lo cierra.
+ */
+@Composable
+private fun MenuInicio(onCerrar: () -> Unit, onCerrarSesion: () -> Unit, onPerfil: () -> Unit, onModoDemo: (() -> Unit)?) {
+    BackHandler(onBack = onCerrar)
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }, onClick = onCerrar),
+    ) {
+        val forma = RoundedCornerShape(14.dp)
+        Column(
+            modifier = Modifier
+                .windowInsetsPadding(WindowInsets.statusBars)
+                .padding(start = MARGEN_PERSONALIZACION, top = 10.dp)
+                .width(181.dp)
+                .clip(forma)
+                .background(PerfilPanelFondo)
+                .border(2.dp, PerfilPanelBorde, forma)
+                // Los toques dentro del panel no lo cierran
+                .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) {}
+                .padding(start = 2.dp, end = 2.dp, bottom = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            Text(
+                "menú",
+                color = Color.White,
+                fontFamily = PlusJakartaSans,
+                fontWeight = FontWeight.Bold,
+                fontSize = 18.sp,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp),
+            )
+            OpcionMenuInicio("Cerrar sesión", onCerrarSesion)
+            OpcionMenuInicio("Perfil", onPerfil)
+            OpcionMenuInicio("Configuraciones", onClick = null)
+            if (onModoDemo != null) OpcionMenuInicio("Modo demo", onModoDemo)
         }
     }
 }
 
+/** Opción morada del menú; [onClick] null = todavía no disponible (apagada). */
 @Composable
-private fun DatoUsuario(etiqueta: String, valor: String) {
-    Column {
-        Text(etiqueta, style = MaterialTheme.typography.labelMedium, color = TextoSecundario)
-        Text(valor, style = MaterialTheme.typography.bodyLarge)
+private fun OpcionMenuInicio(texto: String, onClick: (() -> Unit)?) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(31.dp)
+            .alpha(if (onClick != null) 1f else 0.45f)
+            .clip(RoundedCornerShape(8.dp))
+            .background(PerfilPanelBorde)
+            .then(if (onClick != null) Modifier.clickable(role = Role.Button, onClick = onClick) else Modifier),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(texto, color = Color.White, fontFamily = PlusJakartaSans, fontWeight = FontWeight.Bold, fontSize = 19.sp, maxLines = 1)
     }
 }
